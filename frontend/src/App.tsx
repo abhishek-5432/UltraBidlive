@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { socket, connectSocket } from './lib/socket';
-import { Trophy, Play, Video, Edit2, Clock, TrendingUp, Users, Lock, User, Mail, ArrowRight, MessageSquare, ChevronLeft, Plus, X, Star, Heart, ShoppingCart, Zap, Volume2, VolumeX, Copy, Check, Search, BarChart2, Bell, Trash2, Timer, Tag, Package, ImageIcon, IndianRupee, ListChecks, CreditCard } from 'lucide-react';
+import { Trophy, Play, Video, Edit2, Clock, TrendingUp, Users, Lock, User, Mail, ArrowRight, MessageSquare, ChevronLeft, Plus, X, Star, Heart, ShoppingCart, Zap, Volume2, VolumeX, Copy, Check, Search, BarChart2, Bell, Trash2, Timer, Tag, Package, ImageIcon, IndianRupee, ListChecks, CreditCard, Mic, MicOff, RefreshCw, Camera } from 'lucide-react';
 import clsx from 'clsx';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -188,6 +188,9 @@ function App() {
   const [selectedGalleryImage, setSelectedGalleryImage] = useState('');
   const [isDraggingImages, setIsDraggingImages] = useState(false);
   const [streamQualityLabel, setStreamQualityLabel] = useState('HD 1080p');
+  const [selectedStreamQuality, setSelectedStreamQuality] = useState<'auto' | '720p' | '1080p'>('1080p');
+  const [micEnabled, setMicEnabled] = useState(false);
+  const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('user');
 
   const markAuctionPaid = (auctionId: string) => {
     setPaidAuctions(prev => {
@@ -616,19 +619,50 @@ function App() {
   const isUploadedImageValue = (value: string) => value.startsWith('data:image/');
   const openImagePicker = () => imageUploadInputRef.current?.click();
 
-  const startBroadcast = async () => {
+  const getVideoConstraints = useCallback((quality: 'auto' | '720p' | '1080p', facingMode: 'user' | 'environment') => {
+    if (quality === '720p') {
+      return {
+        width: { ideal: 1280, max: 1280 },
+        height: { ideal: 720, max: 720 },
+        frameRate: { ideal: 30, max: 30 },
+        facingMode,
+      } satisfies MediaTrackConstraints;
+    }
+    if (quality === '1080p') {
+      return {
+        width: { ideal: 1920, max: 1920 },
+        height: { ideal: 1080, max: 1080 },
+        frameRate: { ideal: 30, max: 30 },
+        facingMode,
+      } satisfies MediaTrackConstraints;
+    }
+    return {
+      width: { ideal: 1280 },
+      height: { ideal: 720 },
+      frameRate: { ideal: 30, max: 30 },
+      facingMode,
+    } satisfies MediaTrackConstraints;
+  }, []);
+
+  const startBroadcast = async (overrides?: { quality?: 'auto' | '720p' | '1080p'; mic?: boolean; facingMode?: 'user' | 'environment' }) => {
     try {
+       const quality = overrides?.quality ?? selectedStreamQuality;
+       const facingMode = overrides?.facingMode ?? cameraFacingMode;
+       const withMic = overrides?.mic ?? micEnabled;
        if (streamRef.current) {
          streamRef.current.getTracks().forEach(track => track.stop());
        }
+       Object.keys(peerConnections).forEach(id => {
+         peerConnections[id]?.close();
+         delete peerConnections[id];
+       });
        const stream = await navigator.mediaDevices.getUserMedia({
-         video: {
-           width: { ideal: 1920, max: 1920 },
-           height: { ideal: 1080, max: 1080 },
-           frameRate: { ideal: 30, max: 30 },
-           facingMode: 'user',
-         },
-         audio: false,
+         video: getVideoConstraints(quality, facingMode),
+         audio: withMic ? {
+           echoCancellation: true,
+           noiseSuppression: true,
+           autoGainControl: true,
+         } : false,
        });
        const [videoTrack] = stream.getVideoTracks();
        if (videoTrack) {
@@ -636,10 +670,13 @@ function App() {
          const settings = videoTrack.getSettings();
          const width = settings.width || 1280;
          const height = settings.height || 720;
-         setStreamQualityLabel(`${width >= 1900 ? 'HD 1080p' : width >= 1200 ? 'HD 720p+' : 'SD'} • ${width}x${height}`);
+         setStreamQualityLabel(`${quality === 'auto' ? 'Auto' : quality === '1080p' ? 'HD 1080p' : 'HD 720p'} • ${width}x${height}`);
        }
        if (videoRef.current) videoRef.current.srcObject = stream;
        streamRef.current = stream;
+       setSelectedStreamQuality(quality);
+       setCameraFacingMode(facingMode);
+       setMicEnabled(withMic);
        setIsBroadcaster(true);
        setIsLive(true);
        socket.emit("broadcaster");
@@ -661,6 +698,23 @@ function App() {
     setIsBroadcaster(false);
     socket.emit('stop_broadcast');
     addToast('info', 'Broadcast stopped.');
+  };
+
+  const handleSwitchCamera = async () => {
+    const nextFacingMode = cameraFacingMode === 'user' ? 'environment' : 'user';
+    setCameraFacingMode(nextFacingMode);
+    if (isBroadcaster) await startBroadcast({ facingMode: nextFacingMode });
+  };
+
+  const handleToggleMic = async () => {
+    const nextMicEnabled = !micEnabled;
+    setMicEnabled(nextMicEnabled);
+    if (isBroadcaster) await startBroadcast({ mic: nextMicEnabled });
+  };
+
+  const handleQualityChange = async (quality: 'auto' | '720p' | '1080p') => {
+    setSelectedStreamQuality(quality);
+    if (isBroadcaster) await startBroadcast({ quality });
   };
 
   const handlePlaceBid = (e: React.FormEvent) => {
@@ -1841,6 +1895,11 @@ function App() {
                       <Video className="w-3 h-3 text-emerald-400" /> {streamQualityLabel}
                     </div>
                   )}
+                    {isBroadcaster && (
+                      <div className={clsx('backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-2 border', micEnabled ? 'bg-emerald-950/80 border-emerald-700/40' : 'bg-slate-950/80 border-slate-800')}>
+                        {micEnabled ? <Mic className="w-3 h-3 text-emerald-400" /> : <MicOff className="w-3 h-3 text-slate-400" />} {micEnabled ? 'MIC ON' : 'MIC OFF'}
+                      </div>
+                    )}
                  <div className="bg-slate-950/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-2 border border-slate-800">
                     <Users className="w-3 h-3 text-violet-400" /> {viewerCount} WATCHING
                  </div>
@@ -1848,16 +1907,27 @@ function App() {
 
                 {!isBroadcaster && (
                 <div className="absolute top-6 right-6 z-20">
-                   <button onClick={startBroadcast} className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-violet-500/20 transition-all flex items-center gap-1.5">
+                   <button onClick={() => startBroadcast()} className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-violet-500/20 transition-all flex items-center gap-1.5">
                       <Video className="w-3 h-3" /> Start Broadcast
                    </button>
                 </div>
               )}
 
                 {isBroadcaster && (
-                 <div className="absolute top-6 right-6 z-20 flex gap-2">
-                   <button onClick={startBroadcast} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5">
-                     <Video className="w-3 h-3" /> Refresh HD
+                 <div className="absolute top-6 right-6 z-20 flex flex-wrap justify-end gap-2 max-w-[430px]">
+                   <select value={selectedStreamQuality} onChange={e => handleQualityChange(e.target.value as 'auto' | '720p' | '1080p')} className="bg-slate-950/90 border border-slate-700 text-white text-xs font-medium px-3 py-1.5 rounded-full outline-none cursor-pointer">
+                     <option value="auto">Auto quality</option>
+                     <option value="720p">720p</option>
+                     <option value="1080p">1080p</option>
+                   </select>
+                   <button onClick={handleToggleMic} className={clsx('text-white text-xs font-medium px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5', micEnabled ? 'bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-700 hover:bg-slate-600')}>
+                     {micEnabled ? <Mic className="w-3 h-3" /> : <MicOff className="w-3 h-3" />} {micEnabled ? 'Mic On' : 'Mic Off'}
+                   </button>
+                   <button onClick={handleSwitchCamera} className="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-sky-500/20 transition-all flex items-center gap-1.5">
+                     <Camera className="w-3 h-3" /> Switch Cam
+                   </button>
+                   <button onClick={() => startBroadcast()} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5">
+                     <RefreshCw className="w-3 h-3" /> Refresh
                    </button>
                    <button onClick={stopBroadcast} className="bg-red-600 hover:bg-red-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-red-500/20 transition-all flex items-center gap-1.5">
                      <X className="w-3 h-3" /> Stop Broadcast
