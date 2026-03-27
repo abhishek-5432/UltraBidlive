@@ -141,6 +141,7 @@ function App() {
   const [chats, setChats] = useState<ChatMsg[]>([]);
   const [chatInput, setChatInput] = useState('');
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const imageUploadInputRef = useRef<HTMLInputElement>(null);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [showProfile, setShowProfile] = useState(false);
@@ -533,6 +534,39 @@ function App() {
     setCreateForm({ itemTitle: '', itemImages: [''], startingPrice: '1000', durationMinutes: '2', reservePrice: '', buyNowPrice: '', category: 'General', description: '', startMode: 'now', startAt: '' });
   };
 
+  const handleLocalImageUpload = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const pickedFiles = Array.from(files).slice(0, 6);
+    const availableSlots = Math.max(0, 6 - createForm.itemImages.filter(Boolean).length);
+    if (availableSlots === 0) {
+      addToast('error', 'Maximum 6 images allowed.');
+      return;
+    }
+
+    try {
+      const uploadedImages = (await Promise.all(
+        pickedFiles.slice(0, availableSlots).map(file => new Promise<string>((resolve, reject) => {
+          if (!file.type.startsWith('image/')) return reject(new Error(`${file.name} is not an image.`));
+          if (file.size > 3 * 1024 * 1024) return reject(new Error(`${file.name} is larger than 3MB.`));
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.onerror = () => reject(new Error(`Could not read ${file.name}.`));
+          reader.readAsDataURL(file);
+        }))
+      )).filter(Boolean);
+
+      setCreateForm(prev => {
+        const existing = prev.itemImages.filter(Boolean);
+        return { ...prev, itemImages: [...existing, ...uploadedImages].slice(0, 6) };
+      });
+      addToast('info', `${uploadedImages.length} image${uploadedImages.length !== 1 ? 's' : ''} uploaded.`);
+    } catch (err: any) {
+      addToast('error', err.message || 'Image upload failed');
+    } finally {
+      if (imageUploadInputRef.current) imageUploadInputRef.current.value = '';
+    }
+  };
+
   const startBroadcast = async () => {
     try {
        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -784,12 +818,17 @@ function App() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between gap-3">
                   <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><ImageIcon className="w-3 h-3" />Product Images *</label>
-                  <button type="button" onClick={() => setCreateForm(p => ({ ...p, itemImages: [...p.itemImages, ''].slice(0, 6) }))} className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40" disabled={createForm.itemImages.length >= 6}>+ Add image</button>
+                  <div className="flex items-center gap-3">
+                    <button type="button" onClick={() => imageUploadInputRef.current?.click()} className="text-[11px] font-medium text-violet-400 hover:text-violet-300 disabled:opacity-40">Upload images</button>
+                    <button type="button" onClick={() => setCreateForm(p => ({ ...p, itemImages: [...p.itemImages, ''].slice(0, 6) }))} className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40" disabled={createForm.itemImages.length >= 6}>+ Add URL</button>
+                  </div>
                 </div>
+                <input ref={imageUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleLocalImageUpload(e.target.files)} />
+                <p className="text-[10px] text-slate-600">Paste image URLs or upload local files up to 3MB each.</p>
                 <div className="space-y-2">
                   {createForm.itemImages.map((img, index) => (
                     <div key={index} className="flex gap-2">
-                      <input type="text" placeholder={`Image URL ${index + 1}`} value={img} onChange={ev => setCreateForm(p => ({ ...p, itemImages: p.itemImages.map((current, i) => i === index ? ev.target.value : current) }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-emerald-500/60 outline-none placeholder:text-slate-600 transition-colors" />
+                      <input type="text" placeholder={`Image URL ${index + 1} or uploaded image`} value={img} onChange={ev => setCreateForm(p => ({ ...p, itemImages: p.itemImages.map((current, i) => i === index ? ev.target.value : current) }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-emerald-500/60 outline-none placeholder:text-slate-600 transition-colors" />
                       {createForm.itemImages.length > 1 && (
                         <button type="button" onClick={() => setCreateForm(p => { const nextImages = p.itemImages.filter((_, i) => i !== index); return { ...p, itemImages: nextImages.length ? nextImages : [''] }; })} className="px-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-colors">
                           <X className="w-4 h-4" />
@@ -816,7 +855,7 @@ function App() {
                 ) : (
                   <div className="mt-2 rounded-2xl border border-dashed border-slate-700 aspect-video flex flex-col items-center justify-center gap-2 bg-slate-950/50">
                     <ImageIcon className="w-8 h-8 text-slate-700" />
-                    <p className="text-xs text-slate-600">Add 1–6 image URLs for a gallery preview</p>
+                    <p className="text-xs text-slate-600">Add 1–6 images via URL or local upload</p>
                   </div>
                 )}
               </div>
