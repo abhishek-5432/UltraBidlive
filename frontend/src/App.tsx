@@ -8,6 +8,7 @@ interface AuctionCard { id: string; itemTitle: string; itemImage: string; itemIm
 interface ChatMsg { id: string; userId: string; message: string; timestamp: number; }
 interface Toast { id: string; type: 'outbid' | 'win' | 'error' | 'info'; message: string; }
 interface Notif { id: string; type: 'outbid' | 'win' | 'info'; message: string; read: boolean; timestamp: number; }
+interface AuthUser { id?: string; username: string; email?: string; }
 interface FloatingReaction { id: string; emoji: string; x: number; }
 const REACTION_KEYS = ['FIRE','CLAP','MONEY','WOW','ROCKET'];
 const REACTION_EMOJI: Record<string,string> = { FIRE:'🔥', CLAP:'👏', MONEY:'💰', WOW:'😮', ROCKET:'🚀' };
@@ -136,7 +137,7 @@ function App() {
   });
   
   const [bidAmount, setBidAmount] = useState('');
-  const [myUser, setMyUser] = useState<{username: string} | null>(JSON.parse(localStorage.getItem('user') || 'null'));
+  const [myUser, setMyUser] = useState<AuthUser | null>(JSON.parse(localStorage.getItem('user') || 'null'));
   const [timeRemaining, setTimeRemaining] = useState(0);
   const timeDriftRef = useRef(0);
   const auctionTotalDurationRef = useRef(120);
@@ -236,7 +237,7 @@ function App() {
           } catch { addToast('error', 'Payment verification error'); }
           setPaymentProcessing(false);
         },
-        prefill: { name: myUser?.username || '', email: '' },
+        prefill: { name: myUser?.username || '', email: myUser?.email || '' },
         theme: { color: '#3b82f6', backdrop_color: '#0f172a' },
         modal: { ondismiss: () => setPaymentProcessing(false) },
       };
@@ -915,7 +916,7 @@ function App() {
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
       <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 w-full max-w-md shadow-2xl max-h-[80vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-white" style={{fontFamily:"'Space Grotesk',sans-serif"}}>My Profile</h2><button onClick={() => setShowProfile(false)} className="p-2 hover:bg-slate-800 rounded-lg"><X className="w-5 h-5 text-slate-400" /></button></div>
-        <div className="flex items-center gap-4 mb-6 p-4 bg-white/[0.03] border border-white/8 rounded-2xl"><div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-md" style={{ background: userColor(profileData.username) }}>{profileData.username?.[0]?.toUpperCase()}</div><div><p className="font-semibold text-white text-lg">{profileData.username}</p><p className="text-slate-500 text-xs mt-0.5">{profileData.totalBids} bids · {profileData.wins} wins</p></div></div>
+        <div className="flex items-center gap-4 mb-6 p-4 bg-white/[0.03] border border-white/8 rounded-2xl"><div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-md" style={{ background: userColor(profileData.username) }}>{profileData.username?.[0]?.toUpperCase()}</div><div><p className="font-semibold text-white text-lg">{profileData.username}</p>{profileData.email && <p className="text-slate-400 text-xs mt-0.5 break-all">{profileData.email}</p>}<p className="text-slate-500 text-xs mt-1">{profileData.totalBids} bids · {profileData.wins} wins</p></div></div>
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4 text-center"><p className="text-2xl font-bold text-violet-400">{profileData.totalBids}</p><p className="text-xs text-slate-500 font-medium mt-1">Total Bids</p></div>
           <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4 text-center"><p className="text-2xl font-bold text-yellow-400">{profileData.wins}</p><p className="text-xs text-slate-500 font-medium mt-1">Auctions Won</p></div>
@@ -1180,7 +1181,10 @@ function App() {
               <button onClick={() => setShowCreateAuction(true)} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-all shadow-md shadow-emerald-500/20"><Tag className="w-3.5 h-3.5" /> Sell</button>
               <button onClick={loadProfile} className="flex items-center gap-2 rounded-full px-3 py-1.5 bg-white/5 border border-white/10 hover:border-white/20 transition-all">
                 <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-semibold flex-shrink-0" style={{ background: myUser?.username ? userColor(myUser.username) : '#7c3aed' }}>{myUser?.username?.[0]?.toUpperCase()}</div>
-                <span className="text-sm font-medium text-slate-300 hidden sm:block">{myUser?.username}</span>
+                <div className="hidden sm:block text-left leading-tight">
+                  <p className="text-sm font-medium text-slate-300">{myUser?.username}</p>
+                  {myUser?.email && <p className="text-[11px] text-slate-500">{myUser.email}</p>}
+                </div>
               </button>
               <button onClick={handleLogout} className="text-slate-500 hover:text-slate-300 text-sm font-medium transition-colors px-2">Sign out</button>
             </div>
@@ -1647,7 +1651,10 @@ function App() {
                 <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white font-black border border-violet-800/50 flex-shrink-0" style={{ background: myUser?.username ? userColor(myUser.username) : '#7c3aed' }}>
                   {myUser?.username?.[0] || 'U'}
                 </div>
-                <span className="text-xs font-bold text-violet-200 tracking-wide">{myUser?.username}</span>
+                <div className="text-left leading-tight">
+                  <p className="text-xs font-bold text-violet-200 tracking-wide">{myUser?.username}</p>
+                  {myUser?.email && <p className="text-[10px] text-violet-300/70">{myUser.email}</p>}
+                </div>
              </button>
              <button onClick={handleLogout} className="bg-white/5 text-slate-400 px-4 py-1.5 rounded-lg font-medium text-sm hover:text-red-400 hover:bg-red-900/20 border border-white/10 transition-all">
                 Sign out

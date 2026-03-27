@@ -48,7 +48,7 @@ app.post('/api/register', async (req, res) => {
     db.data.users.push(newUser);
     await db.write();
     const token = generateToken(newUser.id, newUser.username);
-    res.json({ token, user: { id: newUser.id, username: newUser.username } });
+    res.json({ token, user: { id: newUser.id, username: newUser.username, email: newUser.email } });
   } catch { res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -70,7 +70,7 @@ app.post('/api/auth/google', async (req, res) => {
       await db.write();
     }
     const token = generateToken(user.id, user.username);
-    res.json({ token, user: { id: user.id, username: user.username } });
+    res.json({ token, user: { id: user.id, username: user.username, email: user.email } });
   } catch { res.status(401).json({ error: 'Google authentication failed' }); }
 });
 
@@ -82,7 +82,7 @@ app.post('/api/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password || '');
     if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
     const token = generateToken(user.id, user.username);
-    res.json({ token, user: { id: user.id, username: user.username } });
+    res.json({ token, user: { id: user.id, username: user.username, email: user.email } });
   } catch { res.status(500).json({ error: 'Server error' }); }
 });
 
@@ -120,7 +120,7 @@ app.get('/api/profile/:username', (req, res) => {
     const auction = db.data.auctions.find(a => a.id === b.auctionId);
     return { auctionTitle: auction?.itemTitle ?? 'Unknown', amount: b.amount, timestamp: b.timestamp, won: auction?.highestBidderId === username && auction?.status === 'Closed' };
   });
-  res.json({ username: user.username, totalBids: userBids.length, wins: wins.length, bidHistory: bidHistory.slice(0, 20) });
+  res.json({ username: user.username, email: user.email, totalBids: userBids.length, wins: wins.length, bidHistory: bidHistory.slice(0, 20) });
 });
 
 // ── Payment: create Razorpay order ───────────────────────────────
