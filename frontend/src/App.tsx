@@ -96,6 +96,22 @@ const config = {
   iceServers: [{ urls: ["stun:stun.l.google.com:19302"] }]
 };
 
+async function optimizeVideoSender(peerConnection: RTCPeerConnection) {
+  const sender = peerConnection.getSenders().find(s => s.track?.kind === 'video');
+  if (!sender) return;
+  try {
+    const params = sender.getParameters();
+    params.encodings = [{
+      ...(params.encodings?.[0] || {}),
+      maxBitrate: 2_500_000,
+      maxFramerate: 30,
+      scaleResolutionDownBy: 1,
+    }];
+    params.degradationPreference = 'maintain-resolution';
+    await sender.setParameters(params);
+  } catch {}
+}
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
@@ -171,6 +187,7 @@ function App() {
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [selectedGalleryImage, setSelectedGalleryImage] = useState('');
   const [isDraggingImages, setIsDraggingImages] = useState(false);
+  const [streamQualityLabel, setStreamQualityLabel] = useState('HD 1080p');
 
   const markAuctionPaid = (auctionId: string) => {
     setPaidAuctions(prev => {
@@ -413,7 +430,10 @@ function App() {
     socket.on("watcher", id => {
       const peerConnection = new RTCPeerConnection(config);
       peerConnections[id] = peerConnection;
-      if (streamRef.current) streamRef.current.getTracks().forEach(track => { peerConnection.addTrack(track, streamRef.current!); });
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => { peerConnection.addTrack(track, streamRef.current!); });
+        void optimizeVideoSender(peerConnection);
+      }
       peerConnection.onicecandidate = event => { if (event.candidate) socket.emit("candidate", id, event.candidate); };
       peerConnection.createOffer()
         .then(sdp => peerConnection.setLocalDescription(sdp))
@@ -422,7 +442,10 @@ function App() {
 
     socket.on("broadcaster", () => { if (!isBroadcaster) socket.emit("watcher"); });
     socket.on("disconnectPeer", id => { if (peerConnections[id]) { peerConnections[id].close(); delete peerConnections[id]; }});
-    socket.on("broadcaster_disconnect", () => { setIsLive(false); if (videoRef.current) videoRef.current.srcObject = null; });
+    socket.on("broadcaster_disconnect", () => {
+      setIsLive(false);
+      if (!isBroadcaster && videoRef.current) videoRef.current.srcObject = null;
+    });
 
     if (!isBroadcaster) socket.emit("watcher"); 
 
@@ -487,6 +510,11 @@ function App() {
   }, [handleGoogleLogin]);
 
   const handleLogout = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      socket.emit('stop_broadcast');
+    }
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setIsAuthenticated(false);
@@ -590,7 +618,26 @@ function App() {
 
   const startBroadcast = async () => {
     try {
-       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+       if (streamRef.current) {
+         streamRef.current.getTracks().forEach(track => track.stop());
+       }
+       const stream = await navigator.mediaDevices.getUserMedia({
+         video: {
+           width: { ideal: 1920, max: 1920 },
+           height: { ideal: 1080, max: 1080 },
+           frameRate: { ideal: 30, max: 30 },
+           facingMode: 'user',
+         },
+         audio: false,
+       });
+       const [videoTrack] = stream.getVideoTracks();
+       if (videoTrack) {
+         videoTrack.contentHint = 'detail';
+         const settings = videoTrack.getSettings();
+         const width = settings.width || 1280;
+         const height = settings.height || 720;
+         setStreamQualityLabel(`${width >= 1900 ? 'HD 1080p' : width >= 1200 ? 'HD 720p+' : 'SD'} • ${width}x${height}`);
+       }
        if (videoRef.current) videoRef.current.srcObject = stream;
        streamRef.current = stream;
        setIsBroadcaster(true);
@@ -600,6 +647,20 @@ function App() {
        console.error(e);
        alert("Camera access denied or unvailable! Please grant permissions.");
     }
+  };
+
+  const stopBroadcast = () => {
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+    Object.keys(peerConnections).forEach(id => {
+      peerConnections[id]?.close();
+      delete peerConnections[id];
+    });
+    if (videoRef.current) videoRef.current.srcObject = null;
+    setIsLive(false);
+    setIsBroadcaster(false);
+    socket.emit('stop_broadcast');
+    addToast('info', 'Broadcast stopped.');
   };
 
   const handlePlaceBid = (e: React.FormEvent) => {
@@ -1471,7 +1532,7 @@ function App() {
       <header className="relative w-full border-b border-white/[0.06] bg-[#09090f]/90 backdrop-blur-xl z-50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button onClick={() => { socket.emit('leave_auction', auctionState.auctionId); setView('lobby'); }} className="p-2 hover:bg-white/8 rounded-lg transition-all text-slate-400 hover:text-white"><ChevronLeft className="w-5 h-5" /></button>
+            <button onClick={() => { if (isBroadcaster) stopBroadcast(); socket.emit('leave_auction', auctionState.auctionId); setView('lobby'); }} className="p-2 hover:bg-white/8 rounded-lg transition-all text-slate-400 hover:text-white"><ChevronLeft className="w-5 h-5" /></button>
             <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-lg flex items-center justify-center shadow-md shadow-violet-500/20">
                <TrendingUp className="w-4 h-4 text-white" />
             </div>
@@ -1775,18 +1836,34 @@ function App() {
                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div> LIVE
                     </div>
                  )}
+                  {isBroadcaster && (
+                    <div className="bg-slate-950/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-2 border border-slate-800">
+                      <Video className="w-3 h-3 text-emerald-400" /> {streamQualityLabel}
+                    </div>
+                  )}
                  <div className="bg-slate-950/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-2 border border-slate-800">
                     <Users className="w-3 h-3 text-violet-400" /> {viewerCount} WATCHING
                  </div>
               </div>
 
-              {!isLive && !isBroadcaster && (
+                {!isBroadcaster && (
                 <div className="absolute top-6 right-6 z-20">
                    <button onClick={startBroadcast} className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-violet-500/20 transition-all flex items-center gap-1.5">
                       <Video className="w-3 h-3" /> Start Broadcast
                    </button>
                 </div>
               )}
+
+                {isBroadcaster && (
+                 <div className="absolute top-6 right-6 z-20 flex gap-2">
+                   <button onClick={startBroadcast} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5">
+                     <Video className="w-3 h-3" /> Refresh HD
+                   </button>
+                   <button onClick={stopBroadcast} className="bg-red-600 hover:bg-red-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-red-500/20 transition-all flex items-center gap-1.5">
+                     <X className="w-3 h-3" /> Stop Broadcast
+                   </button>
+                 </div>
+                )}
 
               <div className="flex-1 bg-slate-950 rounded-2xl relative overflow-hidden border border-slate-800 flex items-center justify-center">
                  <video ref={videoRef} autoPlay playsInline muted={isBroadcaster} className={clsx("w-full h-full object-cover transition-opacity duration-1000", isLive ? "opacity-100" : "opacity-0")} />

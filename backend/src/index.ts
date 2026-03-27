@@ -286,6 +286,12 @@ io.on('connection', (socket) => {
   socket.join(`user:${user.username}`);
 
   socket.on('broadcaster', () => { broadcasterId = socket.id; socket.broadcast.emit('broadcaster'); });
+  socket.on('stop_broadcast', () => {
+    if (broadcasterId !== socket.id) return;
+    broadcasterId = '';
+    socket.broadcast.emit('broadcaster_disconnect');
+    socket.broadcast.emit('disconnectPeer', socket.id);
+  });
   socket.on('watcher', () => { if (broadcasterId) socket.to(broadcasterId).emit('watcher', socket.id); });
   socket.on('offer', (id, msg) => socket.to(id).emit('offer', socket.id, msg));
   socket.on('answer', (id, msg) => socket.to(id).emit('answer', socket.id, msg));
