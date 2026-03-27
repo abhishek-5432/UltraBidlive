@@ -2,6 +2,8 @@ import { Queue, Worker, Job } from 'bullmq';
 import { redisClient } from './redis.js';
 import { Server } from 'socket.io';
 
+const bullConnection = redisClient as any;
+
 let ioInstance: Server | null = null;
 
 export const setIoInstance = (io: Server) => {
@@ -10,7 +12,7 @@ export const setIoInstance = (io: Server) => {
 
 // Queue for processing bids sequentially
 export const bidQueue = new Queue('bids', {
-  connection: redisClient,
+  connection: bullConnection,
 });
 
 // Worker processes 1 bid at a time (per queue) to prevent race conditions
@@ -60,7 +62,7 @@ export const bidWorker = new Worker('bids', async (job: Job) => {
     throw new Error('Bid too low');
   }
 }, {
-  connection: redisClient,
+  connection: bullConnection,
   concurrency: 1 
 });
 

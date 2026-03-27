@@ -389,7 +389,7 @@ io.on('connection', (socket) => {
     const parsedStart = startAt ? new Date(startAt).getTime() : Date.now();
     const safeStart = Number.isFinite(parsedStart) && parsedStart > Date.now() + 30000 ? parsedStart : Date.now();
     const isScheduled = safeStart > Date.now() + 10000;
-    const auction = {
+    const auction: import('./db.js').Auction = {
       id: uuidv4(), itemTitle, createdBy: user.username,
       itemImage: primaryImage,
       itemImages: cleanedImages.length ? cleanedImages : [primaryImage],
@@ -403,7 +403,7 @@ io.on('connection', (socket) => {
     };
     db.data.auctions.push(auction); await db.write();
     io.emit('auction_created', { ...auction, bidCount: 0 });
-    socket.emit('auction_created_confirm', auction.id);
+    socket.emit('auction_created_confirm', { auctionId: auction.id, status: auction.status, startTime: auction.startTime });
   });
 
   socket.on('restart_auction', async ({ auctionId, durationMinutes }) => {

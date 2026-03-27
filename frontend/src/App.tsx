@@ -58,6 +58,10 @@ function userColor(name: string) {
   let h = 0; for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
   return palette[Math.abs(h) % palette.length];
 }
+function formatDateTimeLocal(timestamp: number) {
+  const date = new Date(timestamp - new Date().getTimezoneOffset() * 60000);
+  return date.toISOString().slice(0, 16);
+}
 const CAT_COLORS: Record<string, string> = {
   General:'#3b82f6', Electronics:'#06b6d4', Antiques:'#f59e0b',
   Art:'#ec4899', Jewelry:'#a855f7', Vehicles:'#ef4444', Collectibles:'#10b981',
@@ -316,7 +320,14 @@ function App() {
       setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
     });
     socket.on('auction_created', (a: AuctionCard) => setLobbyAuctions(prev => [a, ...prev]));
-    socket.on('auction_created_confirm', (auctionId: string) => joinAuction(auctionId));
+    socket.on('auction_created_confirm', ({ auctionId, status, startTime }: { auctionId: string; status: string; startTime?: number }) => {
+      if (status === 'Upcoming') {
+        setView('lobby');
+        addToast('info', `Auction scheduled for ${new Date(startTime || Date.now()).toLocaleString()}`);
+        return;
+      }
+      joinAuction(auctionId);
+    });
     socket.on('auction_not_found', () => { setView('lobby'); addToast('error', 'Auction not found.'); });
     socket.on('auction_deleted', ({ auctionId }: { auctionId: string }) => {
       setLobbyAuctions(prev => prev.filter(a => a.id !== auctionId));
@@ -981,7 +992,7 @@ function App() {
             {createForm.startMode === 'scheduled' && (
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-slate-400">Start date & time</label>
-                <input type="datetime-local" value={createForm.startAt} min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)} onChange={ev => setCreateForm(p => ({ ...p, startAt: ev.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-violet-500/60 outline-none" />
+                <input type="datetime-local" value={createForm.startAt} min={formatDateTimeLocal(Date.now() + 60_000)} onChange={ev => setCreateForm(p => ({ ...p, startAt: ev.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-violet-500/60 outline-none" />
                 <p className="text-xs text-slate-600">Your auction will stay in Upcoming mode until this time.</p>
               </div>
             )}
