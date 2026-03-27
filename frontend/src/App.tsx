@@ -574,6 +574,9 @@ function App() {
     await handleLocalImageUpload(e.dataTransfer.files);
   };
 
+  const isUploadedImageValue = (value: string) => value.startsWith('data:image/');
+  const openImagePicker = () => imageUploadInputRef.current?.click();
+
   const startBroadcast = async () => {
     try {
        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -826,12 +829,12 @@ function App() {
                 <div className="flex items-center justify-between gap-3">
                   <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><ImageIcon className="w-3 h-3" />Product Images *</label>
                   <div className="flex items-center gap-3">
-                    <button type="button" onClick={() => imageUploadInputRef.current?.click()} className="text-[11px] font-medium text-violet-400 hover:text-violet-300 disabled:opacity-40">Upload images</button>
+                    <button type="button" onClick={openImagePicker} className="text-[11px] font-medium text-violet-400 hover:text-violet-300 disabled:opacity-40">Choose from gallery</button>
                     <button type="button" onClick={() => setCreateForm(p => ({ ...p, itemImages: [...p.itemImages, ''].slice(0, 6) }))} className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40" disabled={createForm.itemImages.length >= 6}>+ Add URL</button>
                   </div>
                 </div>
-                <input ref={imageUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleLocalImageUpload(e.target.files)} />
-                <p className="text-[10px] text-slate-600">Paste image URLs or upload local files up to 3MB each.</p>
+                <input id="auction-image-upload" ref={imageUploadInputRef} type="file" accept="image/*" multiple className="sr-only" onChange={e => handleLocalImageUpload(e.target.files)} />
+                <p className="text-[10px] text-slate-600">Paste image URLs or choose images from gallery/files up to 3MB each.</p>
                 <div
                   onDragEnter={e => { e.preventDefault(); setIsDraggingImages(true); }}
                   onDragOver={e => { e.preventDefault(); if (!isDraggingImages) setIsDraggingImages(true); }}
@@ -841,7 +844,7 @@ function App() {
                     if (!nextTarget || !e.currentTarget.contains(nextTarget)) setIsDraggingImages(false);
                   }}
                   onDrop={handleImageDrop}
-                  onClick={() => imageUploadInputRef.current?.click()}
+                  onClick={openImagePicker}
                   className={clsx(
                     'rounded-2xl border border-dashed px-4 py-5 transition-all cursor-pointer text-center select-none',
                     isDraggingImages
@@ -855,20 +858,38 @@ function App() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-white">Drag & drop images here</p>
-                      <p className="text-[11px] text-slate-500 mt-1">or click to browse from your device</p>
+                      <p className="text-[11px] text-slate-500 mt-1">or tap to open gallery / files</p>
                     </div>
                   </div>
                 </div>
                 <div className="space-y-2">
                   {createForm.itemImages.map((img, index) => (
-                    <div key={index} className="flex gap-2">
-                      <input type="text" placeholder={`Image URL ${index + 1} or uploaded image`} value={img} onChange={ev => setCreateForm(p => ({ ...p, itemImages: p.itemImages.map((current, i) => i === index ? ev.target.value : current) }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-emerald-500/60 outline-none placeholder:text-slate-600 transition-colors" />
-                      {createForm.itemImages.length > 1 && (
-                        <button type="button" onClick={() => setCreateForm(p => { const nextImages = p.itemImages.filter((_, i) => i !== index); return { ...p, itemImages: nextImages.length ? nextImages : [''] }; })} className="px-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-colors">
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                    isUploadedImageValue(img) ? (
+                      <div key={index} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                        <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-950 border border-white/10 flex-shrink-0">
+                          <img src={img} alt={`uploaded-${index}`} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-white">Uploaded image {index + 1}</p>
+                          <p className="text-[11px] text-slate-500 truncate">Selected from your gallery/files</p>
+                        </div>
+                        <button type="button" onClick={openImagePicker} className="px-3 py-2 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-300 text-xs font-medium hover:bg-violet-500/20 transition-colors">Add more</button>
+                        {createForm.itemImages.length > 1 && (
+                          <button type="button" onClick={() => setCreateForm(p => { const nextImages = p.itemImages.filter((_, i) => i !== index); return { ...p, itemImages: nextImages.length ? nextImages : [''] }; })} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-colors">
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div key={index} className="flex gap-2">
+                        <input type="text" placeholder={`Image URL ${index + 1}`} value={img} onChange={ev => setCreateForm(p => ({ ...p, itemImages: p.itemImages.map((current, i) => i === index ? ev.target.value : current) }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-emerald-500/60 outline-none placeholder:text-slate-600 transition-colors" />
+                        {createForm.itemImages.length > 1 && (
+                          <button type="button" onClick={() => setCreateForm(p => { const nextImages = p.itemImages.filter((_, i) => i !== index); return { ...p, itemImages: nextImages.length ? nextImages : [''] }; })} className="px-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-colors">
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    )
                   ))}
                 </div>
                 {createForm.itemImages.some(Boolean) ? (
