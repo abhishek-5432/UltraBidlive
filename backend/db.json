@@ -1,0 +1,132 @@
+{
+  "users": [
+    {
+      "id": "7dc1e1f9-06df-4a3e-8f04-3da09c139461",
+      "username": "Abhi",
+      "email": "abhisheksharma1062006@gmail.com",
+      "password": "$2b$10$XG3wMvfKMS470c7308tVxuEzWuk5Aq4vRnBBfsJfjgADRuQXngIIu"
+    },
+    {
+      "id": "bef84c44-6f07-47ae-b3c7-e9216e5deec6",
+      "username": "alien",
+      "email": "45abhi454545@gmail.com",
+      "password": "$2b$10$.haCcE.BZRTbLKceKEyLyeIzviwVYISrjgv4I.HUAt760rDP2OYLO"
+    }
+  ],
+  "auctions": [
+    {
+      "id": "59cd336d-1dca-4ecc-bc88-cd96c0271dc0",
+      "itemTitle": "PUNCH  EV",
+      "createdBy": "Abhi",
+      "itemImage": "https://stimg.cardekho.com/images/cms/carnewsimages/editorimages/6998614f17778.jpg",
+      "startingPrice": 10000,
+      "currentBid": 217000,
+      "highestBidderId": "Abhi",
+      "status": "Closed",
+      "endTime": 1774606277054,
+      "category": "General",
+      "reservePrice": null,
+      "buyNowPrice": null
+    },
+    {
+      "id": "f196ae30-7cbd-447f-81fd-5bde4cc68632",
+      "itemTitle": "iphone 14",
+      "createdBy": "Abhi",
+      "itemImage": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxESEhAQEA4PDw8QEA8ODw8PEBAPDg0NFREWFhUSFRUYHSggGBslGxUWITIhJSorLjEuFx8zOD8sNygtLi0BCgoKDg0OGhAQGi0dHR8tLS0rNS0rLS0rLSstListNy0rKy0tLS0tLS0tKzAtLy8rKy0rLSstLSsvKystKysrK//AABEIAOEA4QMBEQACEQEDEQH/xAAcAAEAAQUBAQAAAAAAAAAAAAAABwIDBAUGAQj/xABIEAACAQICBAkGCwcCBwAAAAAAAQIDBAUREiExYQYHIjJBUXGBshMUdZOx0RUWI0JSVZGUocLSFzNUcnSS8FPBJDQ1YoKis//EABoBAQADAQEBAAAAAAAAAAAAAAABAgMEBQb/xAAxEQEAAgIABAQDBwQDAAAAAAAAAQIDEQQFEiExQVHBYXFyEyIzgZGhsRUj0fE0QlL/2gAMAwEAAhEDEQA/AJxAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUVKqjrby6utvcgLPnfVGXfor/cjadHnX/Y/tj7xs09Vy/oP+6PvGzT3zh/6b+2HvGzTAxXH6NtB1LiUaNNbZ1J04xT6tb1vcNmnKz45MGTa86m8tWcaFdrwhCn9s2DfxFT7vW/SA/bNg38RV+71v0gP2y4P/ABFX7vW/SA/bNg/8RV+71v0gP2zYN/EVPu9b9IFdPjjwZtLzqcc9Wbt6+XhA7HCMXt7qmqttXp16b+dTkpLPqeWx7iRnAAAAAAAAAAAAAAAAAHPcIcXhbUa93Vz0KMZyyW1xjmlFb21+KKpQfX43cTlU06cbenTzzjRdOU1o9Tlmm+1ZFulG0ycAuFMMStY3CpqE1J06tPboVFtyfSnqfY0VS3cLmMpaOi0m2lJde9BK7OWSefQBClan8KYheVbnl2tjVlaW9B/u3Vi8qk5Lp1r7Guo0prxl6PL+GrkmbX7xDeStacVlGnTilsUYRSS7EjeMj6LHSuu0NXjtlCtQrUcoRdSDjGTisoy2p/akTNuqNKcThjJjtT1RVX4J3ieXkYatWcalPKW/WykYL28IfNzy7iI8v3hZ+LF3/pL1lP3l44PNPl+8K/0/P/5/eFUOC122l5OK3upTyX4lo4HNPl+8Jjl+f0/eEmYHbwo0aVFqMnCCUpJLKUtrf2tnvYMUY8cU9H0HD44x44p6N3b0KU9UqcJJ6mpQi0+5jLWNeDW8VmNTDW0afwTiNlcWudO1vq0bO6t4v5Pyk3lCcY9G1vdk8tp4PGYa0mLV7Pn+P4euOYtXtEp0RxvNAAAAAAAAAAAAAAAAHIcNMJ86sri3z0fKRlFSyz0ZZ5xbXVnkVWfOdXAMSpy8h5lcSaeipQpudKSerNTS0ct+f2GkX1Ck17p04psAlYWclWlGNSpN1qvKWjCTSWjnseUYrX15mazsbS8o1P3VaFTReyEoyyfcEr13zZdgEM8B5f8AUvSd3+Ura2nu8qjeKfn7Q2l7XyJi23u0jUNNdXe86cbG8tPcXu878c6YzLGd3vOqtlNqoXe83rZG2bbXRtWVol0eEzbyM8klpWeMDVDDn0/Clp7JnjcdeO1fXc/p/t5PMrfdiPim6GxdiOB46oAAAAAAAAAAAAAAABrlHOOvpcvayqzXxtaEqkoJp1IKM5wyecYyz0Xnll0MCJuPbFKqq2tjCbp28oOpUSbUaktLJKXWlty3rqRNY3Kso3w6+qWNalc29XKcaso5Qf7yEZ5OMkuiWWx9vUzS1Y1Eq1tMvq3yulS0nqbgm11PIyaIW4H1MvhL0ld/lMMs/eh9DyeP7Uz8faF/Ea+0vR7NrdnPXlydtOzjvZq6tY6a2YTZa8obVsr1LkJHRSyOptMPg20dNbNau5wK12GOW5ezX8Y71Yel83E7Rd+U8z5PPxf2vMZxR4UpP6zNd+zweNydWTXom6GxdiOtxKgAAAAAAAAAAAAAAAGBBcnvl4mVWeKPTq7QON4wuBlPEIR0tKNSGbp1YZOdNvbqfOTyWa1bFsA4/gvxSqlXhWr1p3Hk5KVODpqlBTWtSlypaXRq1bOnYJlGkvOno08tyXcQlBXBqeUsR9I3XtRjkj70fJ9Hyf8AAt9XtD3Eau01pD0b2c/czOqrivLDkzWsspkijasoZttRzOnGtEOowSwza1G821DTwdhOqremnq8pPk0o9b6ZPcvcuk8bmXHRw2Kb+fl83JxGboq5fhxn5PD89beJ2jb63lM+K5Jeb8Xe095ms/zDw5ncp2hsXYj61V6AAAAAAAAAAAAAAAAw6Gzvl4mVWVuK6l9gDQXUvsAKK6kBavFyX2ED59wKWU8Q9I3XtRS8d4fRco/At9XtC3iE9prSHbeWmrM3q5LStKBtEK6ZdvbNm9KpiroMKwxtrUdVe0NIjTsacKdrS8rV1LZCK59Wf0Yr/Mji4vjKYq7tLDNmirU21adeo61Ta9UYrm04dEV7+k+A5nxtuIvufyeLnyzaWPw9XIw70paeyZHIP+Tb6Z/mHPCc4bF2I+wHoAAAAAAAAAAAAAAADCteau/2sqsugAAFm65rIHzrhMsqmIekLrxIiY7voOU/gW+r2hReM1rDqySwPJ5m9YY6ZtrYt9B0VqvFXS4TgbeWo26oqmZiHTVfI2cFKotKo1nTox5897+jHf7TzeM5lXFHxcuTPvtVy9evVuavlKrzeyEVqhTj9GK/zM+S4vjLZZ3aXm5smm/w62yy1HiZb7l59p3LWcYccqeHelLT2VD2uRU6c0/TP8wVTXR5sf5V7D6pZWAAAAAAAAAAAAAAAAwrTmLv9rKrLwHgACzdrksgfOGGv5W//r7rxFoh73K51gt9XtC9Oi2zWsOm07bHDsHc2tRvXUI3EOxwng3lra2a23qSRW/ERWGV88Qyb7EoUU4UEpT2Oq1nCP8AKvnPfs7T53i+dRO64u/x8vy9XLa828e0OUrpzk5Tk5Sk83KTzbZ4tstrT1WncufLlisahnWFucmW7zL33LoLOkYY69VlGg4yo/J4d6VtPDUPpOU11ln6feF6plo82P8AKvYfQrKwAAAAAAAAAAAAAAAGHbLkrtl4mVWXGAAAWblcl/aB854PTzrX/wDX3PiL18Hs8unWGfn7Q63CcDc2tRabxV0WvEO1s8Lp0YqU+5fOZ53Gcyx8PXd5+UecuW+aZ7QwsVv3JaK5MPorY+3rPkuJ5jm4qe/avp/n1ZxHnLmrqZWkItLHprWaS87NZuLGmcl92nTmb+1pndgw6hMOW4z18nh3pW08NQ9vl1dZJ+XvC9UxU1qS3L2HtrKgAAAAAAAAAAAAAAAGJQ5vfLxMqsrAAVU1rEEvLxch9jLKoG4D2PlK+IatmI3K/wDZFbX6a7erwdtYZ+ftCVrS1jRinktJ7F/ueHzHmUcNj6vG0+Ee8/BFrzedMG/k3m282fGWz3zXm+SdzK9Kw0V2mdOPTbpai4R2UZXotU3rLy87NRvMNZXFTc7ccw6C2R6mOiYcpxpx+Sw70tZ+GoepwddXn5f4Xql+OxdiPTS9AAAAAAAAAAAAAAAAYlDm98vEyqysDwD2LyYHl5NaD19BKNIq4p6CfwnN/NxS7X4RZx8Xkild27REbl14bfc18Ww4QcMqNKTimpzWp6+THdvPjrcJm4zJObL234R6R5O3HiiI+9LmavD5t/Ny7EddOVVj/q1/twrocMYS50Ua/wBMp6aN18mcrmjWXIkk+pmc8vyV70naNtbdQlTetainTPhaNSxy44tHZssGuU2bYKd9PKy01LsbLYepjoyiHK8a6+Sw70tZ+GodvDxq0/JeEtw2LsR3D0AAAAAAAAAAAAAAABiUOb3y8TKrKwPAAFm75j7AIRwnG3a2GK6LyqVsYvKcX0qKhByfsXecnEYftrRSfDxn8vL9dfo2w26Y2jm6vpSk22zaMEQvbPMrKuGW+yhX7VXC7a6Ss4YTGVsLPF5Ra5TKThaRmdjhOOxqxVOrrWxP50exmWThaZI1aF4ysmi5UKsU3nCeunNc2S6tz3HnX4a2G8b8GWbV43CQ8IqaUUzrpDi04/jcxCKqYTbZ8ud9SuGuqEJKCb7XOX9rO3DXxlKaI7F2I6B6AAAAAAAAAAAAAAAAw6Gzvl4mVWXAPAAFm75r7APmm5k3G9h0RxO+l3y0E/Ci1Y80b7Obq09ZfSNrTgNG1LQ0beZkaT1M2xunFrWV6VupIOA3ka8PI1djycZLnQmtklvRF8Vb16ZOtv3wpp2MXTqqVSvGKcacE0pp82Wm9Si+97jHBwWS3wj1ZXyViUYYji9W7xG3uKzWnK6t0ormU6aqLRhHcva2+k7cmOMdIrCuO02ncvrKOxdiMWj0AAAAAAAAAAAAAAABh0NnfLxMqsuAeAeAWbvmvsA+caNHSWIekrv2ovXwVlo7i31ssqxpUiRalTAtumBVTgQOjwCu4yQHa8IsN87tHUgs69tF1I5balHbOG/VylvWXSaYcnTbU+EqZK7jaLrL/mrT+qt//oi3EeCMT7CjsXYjmbPQAAAAAAAAAAAAAAAGHR2d8vEyqysDwABZu+a+wCBcEt9KOI+k7v8AKWhWWqvrPJvUWVayrbkjHlQAtSogI0iBtcNhrQElcE67WRWUwjPhBhPmuLU6CWVNXlvUo9XkKk4ygl2Z6P8A4s2yW6qRKtY1Z9Vx2LsRiu9AAAAAAAAAAAAAAAAYVHZ3y8TKrKwAACzec19gEL8DaOlDEvSl3+UlBiGH63qJ2q0txYbidjCqWW4bQx52e4C2rR9Q2NhYW2tEbS7ng/TyyIlMNPxrWP8AxeD3KWuVaFvN/wAlaEoeOYifu6TrunmGxdiJQ9AAAAAAAAAAAAAAAAYNHZ3y8TKrKwAACzecx9hAifi6p5wxP0rd+yBMobq6sc+gjY1dxhu4naNMCrhm4nZpizwzcNi18GbghmWmHZPYRtLp8JtcsiEw1vGpS+SwuXVittH+6Mn+UQlL8Ni7EXVegAAAAAAAAAAAAAAAMCg9XfLxMqsuAAAFm85j7GBGPFfDk4oulYtd5rq1QEkOyna59BUY9Sx3EjFqYbuAsTwvcBa+C9wRpepYdl0BLY2ttkBzPGv+5w2PS8Xs8l18mp70IJSxDYuxF1VQAAAAAAAAAAAAAAADAlyJOL1RlJyg+jN63HtzzfeVlaFwAAAoqxzTXWBEtW6lgt9dVa1OpPDL+pGrOrTi5Ozu29cpL6Mm3+GWbWTeI6uhw6wqaUliVsk/pzdOXfGSTRGpNq/jnhX1laeuiNSKXwxwr6ytPXRGpNqXwwwr6ytPWxGpHnxuwr6ytPWxGh6uF+FfWVp62I1IprcNsKgnJ4lbNL6E9OXdGKbY1JtzllUnjl/a1KNOpDCcPquv5apFw87uk+TorqTXtzyzyUxCExlkAAAAAAAAAAAAAAAADycU1k0mntTWaYFjzOHQpL+Wc4r8GRpO3vmkeufravvGjZ5pHrn62r7xo2eaR66nrav6ho2s18Koz50Zy7atXZ1c4aNtXPgNhcm3LDLOUntcqEG297y1jSFPxCwn6rsvUU/cNB8QsJ+q7L1FP3DQfELCfquy9RT9w0HxCwn6rsvUU/cNB8QsJ+q7L1FP3DQro8B8Li1KOGWSktafm9PNPdqGhvaVKMUoxioxWpKKSSJFYAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//Z",
+      "startingPrice": 20000,
+      "currentBid": 20000,
+      "highestBidderId": "None",
+      "status": "Closed",
+      "endTime": 1774632729267,
+      "createdAt": 1774632609267,
+      "category": "General",
+      "reservePrice": 20000,
+      "buyNowPrice": 20000,
+      "description": ""
+    },
+    {
+      "id": "e3e882d3-6328-4812-98bd-c8aa213634a2",
+      "itemTitle": "randi",
+      "createdBy": "Abhi",
+      "itemImage": "https://en.wikipedia.org/wiki/Randi_Zuckerberg",
+      "startingPrice": 1,
+      "currentBid": 1,
+      "highestBidderId": "None",
+      "status": "Closed",
+      "endTime": 1774632886365,
+      "createdAt": 1774632766365,
+      "category": "Antiques",
+      "reservePrice": null,
+      "buyNowPrice": null,
+      "description": "kirshnirwhgrhjRO"
+    }
+  ],
+  "bids": [
+    {
+      "id": "213c5ad1-5dfa-4c31-8c78-5cd68d520e49",
+      "auctionId": "59cd336d-1dca-4ecc-bc88-cd96c0271dc0",
+      "userId": "Abhi",
+      "amount": 150000,
+      "timestamp": 1774606186920
+    },
+    {
+      "id": "adb18102-4a9c-4b2d-ac3c-750f334b8f59",
+      "auctionId": "59cd336d-1dca-4ecc-bc88-cd96c0271dc0",
+      "userId": "Abhi",
+      "amount": 200000,
+      "timestamp": 1774606196985
+    },
+    {
+      "id": "62f11a62-dd60-4f81-87e5-8ece6b90a413",
+      "auctionId": "59cd336d-1dca-4ecc-bc88-cd96c0271dc0",
+      "userId": "Abhi",
+      "amount": 200500,
+      "timestamp": 1774606206202
+    },
+    {
+      "id": "eac7b9b1-d490-4421-b7ff-2c97038942e6",
+      "auctionId": "59cd336d-1dca-4ecc-bc88-cd96c0271dc0",
+      "userId": "Abhi",
+      "amount": 201000,
+      "timestamp": 1774606212727
+    },
+    {
+      "id": "05dd4c60-2043-4318-9214-f03cfd1b2258",
+      "auctionId": "59cd336d-1dca-4ecc-bc88-cd96c0271dc0",
+      "userId": "Abhi",
+      "amount": 202000,
+      "timestamp": 1774606224387
+    },
+    {
+      "id": "49696fe2-00f2-48e2-aa3c-f808bb182f55",
+      "auctionId": "59cd336d-1dca-4ecc-bc88-cd96c0271dc0",
+      "userId": "Abhi",
+      "amount": 207000,
+      "timestamp": 1774606230128
+    },
+    {
+      "id": "ede5d42f-4d34-4421-9622-94d41f1bd287",
+      "auctionId": "59cd336d-1dca-4ecc-bc88-cd96c0271dc0",
+      "userId": "Abhi",
+      "amount": 212000,
+      "timestamp": 1774606238005
+    },
+    {
+      "id": "a7767630-336a-4d50-a8a1-79946e662f55",
+      "auctionId": "59cd336d-1dca-4ecc-bc88-cd96c0271dc0",
+      "userId": "Abhi",
+      "amount": 217000,
+      "timestamp": 1774606247054
+    }
+  ],
+  "chats": [
+    {
+      "id": "55b11c0e-7007-43cb-956d-dd3226aea351",
+      "auctionId": "59cd336d-1dca-4ecc-bc88-cd96c0271dc0",
+      "userId": "Abhi",
+      "message": "HELLO",
+      "timestamp": 1774606263433
+    }
+  ],
+  "payments": []
+}
