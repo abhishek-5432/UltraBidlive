@@ -1905,14 +1905,6 @@ function App() {
                  </div>
               </div>
 
-                {!isBroadcaster && (
-                <div className="absolute top-6 right-6 z-20">
-                   <button onClick={() => startBroadcast()} className="bg-violet-600 hover:bg-violet-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-violet-500/20 transition-all flex items-center gap-1.5">
-                      <Video className="w-3 h-3" /> Start Broadcast
-                   </button>
-                </div>
-              )}
-
                 {isBroadcaster && (
                  <div className="absolute top-6 right-6 z-20 flex flex-wrap justify-end gap-2 max-w-[430px]">
                    <select value={selectedStreamQuality} onChange={e => handleQualityChange(e.target.value as 'auto' | '720p' | '1080p')} className="bg-slate-950/90 border border-slate-700 text-white text-xs font-medium px-3 py-1.5 rounded-full outline-none cursor-pointer">
@@ -1938,15 +1930,22 @@ function App() {
               <div className="flex-1 bg-slate-950 rounded-2xl relative overflow-hidden border border-slate-800 flex items-center justify-center">
                  <video ref={videoRef} autoPlay playsInline muted={isBroadcaster} className={clsx("w-full h-full object-cover transition-opacity duration-1000", isLive ? "opacity-100" : "opacity-0")} />
                  
-                 {!isLive && (
-                    <div className="flex flex-col items-center justify-center text-center p-8">
-                       <div className="w-20 h-20 rounded-full bg-slate-900 border-2 border-slate-800 flex items-center justify-center mb-6">
+                  {!isLive && (
+                    <div className="absolute inset-0 z-10 flex items-center justify-center p-8">
+                      <div className="flex flex-col items-center justify-center text-center max-w-sm">
+                        <div className="w-20 h-20 rounded-full bg-slate-900 border-2 border-slate-800 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(15,23,42,0.45)]">
                           <Play className="w-8 h-8 text-slate-700 ml-1" />
-                       </div>
-                       <h3 className="text-xl font-black text-slate-300 tracking-tight">Stream Standby</h3>
-                       <p className="text-xs text-slate-500 font-medium tracking-wide mt-2 max-w-xs">Waiting for the auctioneer to initialize broadcast</p>
+                        </div>
+                        <h3 className="text-xl font-black text-slate-300 tracking-tight">Stream Standby</h3>
+                        <p className="text-xs text-slate-500 font-medium tracking-wide mt-2 max-w-xs">Waiting for the auctioneer to initialize broadcast</p>
+                        {!isBroadcaster && (
+                         <button onClick={() => startBroadcast()} className="mt-6 bg-violet-600 hover:bg-violet-500 text-white text-sm font-medium px-5 py-2.5 rounded-full shadow-md shadow-violet-500/20 transition-all flex items-center gap-2">
+                          <Video className="w-4 h-4" /> Start Broadcast
+                         </button>
+                        )}
+                      </div>
                     </div>
-                 )}
+                  )}
 
                  {lastBidder && (
                    <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none animate-in fade-in zoom-in slide-in-from-bottom-20 duration-500">
