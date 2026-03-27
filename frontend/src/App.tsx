@@ -166,6 +166,7 @@ function App() {
   const [paidAuctions, setPaidAuctions] = useState<Set<string>>(() => new Set(JSON.parse(localStorage.getItem('paidAuctions') || '[]')));
   const [paymentProcessing, setPaymentProcessing] = useState(false);
   const [selectedGalleryImage, setSelectedGalleryImage] = useState('');
+  const [isDraggingImages, setIsDraggingImages] = useState(false);
 
   const markAuctionPaid = (auctionId: string) => {
     setPaidAuctions(prev => {
@@ -567,6 +568,12 @@ function App() {
     }
   };
 
+  const handleImageDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDraggingImages(false);
+    await handleLocalImageUpload(e.dataTransfer.files);
+  };
+
   const startBroadcast = async () => {
     try {
        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -825,6 +832,33 @@ function App() {
                 </div>
                 <input ref={imageUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={e => handleLocalImageUpload(e.target.files)} />
                 <p className="text-[10px] text-slate-600">Paste image URLs or upload local files up to 3MB each.</p>
+                <div
+                  onDragEnter={e => { e.preventDefault(); setIsDraggingImages(true); }}
+                  onDragOver={e => { e.preventDefault(); if (!isDraggingImages) setIsDraggingImages(true); }}
+                  onDragLeave={e => {
+                    e.preventDefault();
+                    const nextTarget = e.relatedTarget as Node | null;
+                    if (!nextTarget || !e.currentTarget.contains(nextTarget)) setIsDraggingImages(false);
+                  }}
+                  onDrop={handleImageDrop}
+                  onClick={() => imageUploadInputRef.current?.click()}
+                  className={clsx(
+                    'rounded-2xl border border-dashed px-4 py-5 transition-all cursor-pointer text-center select-none',
+                    isDraggingImages
+                      ? 'border-violet-500 bg-violet-500/10 shadow-lg shadow-violet-500/10'
+                      : 'border-white/10 bg-white/[0.03] hover:border-violet-500/40 hover:bg-violet-500/[0.04]'
+                  )}
+                >
+                  <div className="flex flex-col items-center gap-2">
+                    <div className={clsx('w-11 h-11 rounded-2xl flex items-center justify-center', isDraggingImages ? 'bg-violet-500/20 text-violet-300' : 'bg-white/5 text-slate-500')}>
+                      <ImageIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-white">Drag & drop images here</p>
+                      <p className="text-[11px] text-slate-500 mt-1">or click to browse from your device</p>
+                    </div>
+                  </div>
+                </div>
                 <div className="space-y-2">
                   {createForm.itemImages.map((img, index) => (
                     <div key={index} className="flex gap-2">
