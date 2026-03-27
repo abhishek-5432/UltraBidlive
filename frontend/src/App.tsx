@@ -66,7 +66,8 @@ const CAT_EMOJIS: Record<string, string> = {
   All:'🔀', General:'🏷️', Electronics:'💻', Antiques:'🏺',
   Art:'🎨', Jewelry:'💎', Vehicles:'🚗', Collectibles:'🃏',
 };
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';;
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '646832990645-7opdki9o8ta3t0ge5h0clrdakrf81ncf.apps.googleusercontent.com';
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
 function Sparkline({ data }: { data: number[] }) {
   if (data.length < 2) return <div className="h-10 flex items-center justify-center text-[10px] text-slate-600 font-bold">No chart data yet</div>;
   const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
@@ -174,7 +175,7 @@ function App() {
     setPaymentProcessing(true);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch('http://localhost:3001/api/payment/create-order', {
+      const res = await fetch(`${BACKEND_URL}/api/payment/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ auctionId }),
@@ -191,7 +192,7 @@ function App() {
         order_id: data.orderId,
         handler: async (response: any) => {
           try {
-            const vRes = await fetch('http://localhost:3001/api/payment/verify', {
+            const vRes = await fetch(`${BACKEND_URL}/api/payment/verify`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
               body: JSON.stringify({ ...response, auctionId }),
@@ -233,7 +234,7 @@ function App() {
 
   useEffect(() => {
     if (isAuthenticated && view === 'lobby') {
-      const fetchAuctions = async () => { try { const r = await fetch('http://localhost:3001/api/auctions'); setLobbyAuctions(await r.json()); } catch {} };
+      const fetchAuctions = async () => { try { const r = await fetch(`${BACKEND_URL}/api/auctions`); setLobbyAuctions(await r.json()); } catch {} };
       fetchAuctions();
       const iv = setInterval(fetchAuctions, 10000);
       // Tick lobby timers every second
@@ -415,7 +416,7 @@ function App() {
     setError('');
     const endpoint = authMode === 'login' ? '/api/login' : '/api/register';
     try {
-      const res = await fetch(`http://localhost:3001${endpoint}`, {
+      const res = await fetch(`${BACKEND_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(authData)
@@ -435,7 +436,7 @@ function App() {
   const handleGoogleLogin = useCallback(async (credential: string) => {
     setError('');
     try {
-      const res = await fetch('http://localhost:3001/api/auth/google', {
+      const res = await fetch(`${BACKEND_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential }),
@@ -476,7 +477,7 @@ function App() {
   const joinAuction = (auctionId: string) => {
     socket.emit('join_auction', auctionId);
     setChats([]); setFullBidHistory([]);
-    fetch(`http://localhost:3001/api/auctions/${auctionId}/bids`)
+    fetch(`${BACKEND_URL}/api/auctions/${auctionId}/bids`)
       .then(r => r.json()).then(setFullBidHistory).catch(() => {});
     socket.once('auction_state', () => setView('auction'));
   };
@@ -499,7 +500,7 @@ function App() {
 
   const loadProfile = async () => {
     if (!myUser) return;
-    try { const r = await fetch(`http://localhost:3001/api/profile/${myUser.username}`); setProfileData(await r.json()); setShowProfile(true); } catch {}
+    try { const r = await fetch(`${BACKEND_URL}/api/profile/${myUser.username}`); setProfileData(await r.json()); setShowProfile(true); } catch {}
   };
 
   const handleCreateAuction = (e: React.FormEvent) => {

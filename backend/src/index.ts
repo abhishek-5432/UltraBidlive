@@ -11,7 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
-const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '646832990645-7opdki9o8ta3t0ge5h0clrdakrf81ncf.apps.googleusercontent.com';
 const googleClient = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // ── Razorpay ──────────────────────────────────────────────────────
