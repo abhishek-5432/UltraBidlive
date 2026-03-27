@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { socket, connectSocket } from './lib/socket';
-import { Trophy, Play, Video, Edit2, Clock, TrendingUp, Users, Lock, User, Mail, ArrowRight, MessageSquare, ChevronLeft, Plus, X, Star, Heart, ShoppingCart, Zap, Volume2, VolumeX, Copy, Check, Award, Search, Filter, BarChart2, Bell, Trash2, Timer, Tag, Package, ImageIcon, IndianRupee, ListChecks, CreditCard, MapPin } from 'lucide-react';
+import { Trophy, Play, Video, Edit2, Clock, TrendingUp, Users, Lock, User, Mail, ArrowRight, MessageSquare, ChevronLeft, Plus, X, Star, Heart, ShoppingCart, Zap, Volume2, VolumeX, Copy, Check, Search, BarChart2, Bell, Trash2, Timer, Tag, Package, ImageIcon, IndianRupee, ListChecks, CreditCard } from 'lucide-react';
 import clsx from 'clsx';
 
 // ── Types ──────────────────────────────────────────────────────────
@@ -129,7 +129,7 @@ function App() {
   const [lobbyAuctions, setLobbyAuctions] = useState<AuctionCard[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>(() => JSON.parse(localStorage.getItem('watchlist') || '[]'));
   const [lobbyTab, setLobbyTab] = useState<'all' | 'watchlist'>('all');
-  const [lobbyFilter, setLobbyFilter] = useState<'all' | 'active' | 'ending_soon' | 'ended' | 'buy_now' | 'watchlist'>('all');
+  const [lobbyFilter, setLobbyFilter] = useState<'all' | 'active' | 'ending_soon' | 'ended' | 'buy_now' | 'watchlist' | 'mine'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'bids' | 'ending' | 'price_low' | 'price_high'>('newest');
   const [notifications, setNotifications] = useState<Notif[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -535,11 +535,6 @@ function App() {
     socket.emit('place_bid', { auctionId: auctionState.auctionId, amount });
   };
 
-  const handleQuickBid = () => {
-     const nextBid = (auctionState.currentBid || auctionState.startingPrice) + 500;
-     socket.emit('place_bid', { auctionId: auctionState.auctionId, amount: nextBid });
-  };
-
   const handleSaveItemEdit = () => {
      if (!editTitle && !editImage) return setIsEditingItem(false);
      socket.emit('update_item', {
@@ -911,7 +906,7 @@ function App() {
             <div className="flex gap-2 flex-wrap">
               <button onClick={() => { setLobbyTab('all'); setLobbyFilter('all'); }} className={clsx('px-4 py-2 rounded-lg font-medium text-sm transition-all border', lobbyTab === 'all' && lobbyFilter === 'all' ? 'bg-violet-600 border-violet-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/20')}>All</button>
               <button onClick={() => { setLobbyTab('watchlist'); setLobbyFilter('watchlist'); }} className={clsx('px-4 py-2 rounded-lg font-medium text-sm transition-all border flex items-center gap-1.5', lobbyTab === 'watchlist' ? 'bg-yellow-500 border-yellow-400 text-slate-950 shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}><Star className="w-3.5 h-3.5" /> Watchlist {watchlist.length > 0 && <span className={clsx('rounded-full px-1.5 text-xs font-semibold', lobbyTab === 'watchlist' ? 'bg-yellow-900/40 text-yellow-950' : 'bg-yellow-500/15 text-yellow-400')}>{watchlist.length}</span>}</button>
-              <button onClick={() => { setLobbyTab('all'); setLobbyFilter('mine' as any); }} className={clsx('px-4 py-2 rounded-lg font-medium text-sm transition-all border flex items-center gap-1.5', lobbyFilter === 'mine' ? 'bg-emerald-600 border-emerald-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}><ListChecks className="w-3.5 h-3.5" /> My Listings {lobbyAuctions.filter(a=>a.createdBy===myUser?.username).length > 0 && <span className={clsx('rounded-full px-1.5 text-xs font-semibold', lobbyFilter === 'mine' ? 'bg-white/20 text-white' : 'bg-emerald-500/15 text-emerald-400')}>{lobbyAuctions.filter(a=>a.createdBy===myUser?.username).length}</span>}</button>
+              <button onClick={() => { setLobbyTab('all'); setLobbyFilter('mine'); }} className={clsx('px-4 py-2 rounded-lg font-medium text-sm transition-all border flex items-center gap-1.5', lobbyFilter === 'mine' ? 'bg-emerald-600 border-emerald-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}><ListChecks className="w-3.5 h-3.5" /> My Listings {lobbyAuctions.filter(a=>a.createdBy===myUser?.username).length > 0 && <span className={clsx('rounded-full px-1.5 text-xs font-semibold', lobbyFilter === 'mine' ? 'bg-white/20 text-white' : 'bg-emerald-500/15 text-emerald-400')}>{lobbyAuctions.filter(a=>a.createdBy===myUser?.username).length}</span>}</button>
             </div>
           </div>
 
@@ -981,7 +976,7 @@ function App() {
               else if (lobbyFilter === 'ended') matchFilter = a.status === 'Closed';
               else if (lobbyFilter === 'buy_now') matchFilter = !!a.buyNowPrice && a.status === 'Active';
               else if (lobbyFilter === 'watchlist') matchFilter = watchlist.includes(a.id);
-              else if (lobbyFilter === ('mine' as any)) matchFilter = a.createdBy === myUser?.username;
+              else if (lobbyFilter === 'mine') matchFilter = a.createdBy === myUser?.username;
               return matchSearch && matchCat && matchWatchlist && matchFilter;
             }).sort((a, b) => {
               if (sortBy === 'bids') return b.bidCount - a.bidCount;
