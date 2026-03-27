@@ -4,7 +4,7 @@ import { Trophy, Play, Video, Edit2, Clock, TrendingUp, Users, Lock, User, Mail,
 import clsx from 'clsx';
 
 // ── Types ──────────────────────────────────────────────────────────
-interface AuctionCard { id: string; itemTitle: string; itemImage: string; startingPrice: number; currentBid: number; highestBidderId: string; status: string; endTime: number; bidCount: number; category: string; buyNowPrice: number | null; createdBy?: string; description?: string; createdAt?: number; }
+interface AuctionCard { id: string; itemTitle: string; itemImage: string; itemImages?: string[]; startingPrice: number; currentBid: number; highestBidderId: string; status: string; startTime?: number; endTime: number; bidCount: number; category: string; buyNowPrice: number | null; createdBy?: string; description?: string; createdAt?: number; }
 interface ChatMsg { id: string; userId: string; message: string; timestamp: number; }
 interface Toast { id: string; type: 'outbid' | 'win' | 'error' | 'info'; message: string; }
 interface Notif { id: string; type: 'outbid' | 'win' | 'info'; message: string; read: boolean; timestamp: number; }
@@ -103,10 +103,12 @@ function App() {
     startingPrice: 1000,
     highestBidderId: 'None',
     status: 'Loading...',
+    startTime: Date.now(),
     endTime: Date.now() + 60000,
     history: [] as { userId: string, amount: number }[],
     itemTitle: 'Antique Gold Watch',
     itemImage: 'https://images.unsplash.com/photo-1587836374828-cb4387dfee7d?auto=format&fit=crop&q=80&w=400&h=400',
+    itemImages: [] as string[],
     auctionId: '',
     buyNowPrice: null as number | null,
     reservePrice: null as number | null,
@@ -130,7 +132,7 @@ function App() {
   const [lobbyAuctions, setLobbyAuctions] = useState<AuctionCard[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>(() => JSON.parse(localStorage.getItem('watchlist') || '[]'));
   const [lobbyTab, setLobbyTab] = useState<'all' | 'watchlist'>('all');
-  const [lobbyFilter, setLobbyFilter] = useState<'all' | 'active' | 'ending_soon' | 'ended' | 'buy_now' | 'watchlist' | 'mine'>('all');
+  const [lobbyFilter, setLobbyFilter] = useState<'all' | 'active' | 'upcoming' | 'ending_soon' | 'ended' | 'buy_now' | 'watchlist' | 'mine'>('all');
   const [sortBy, setSortBy] = useState<'newest' | 'bids' | 'ending' | 'price_low' | 'price_high'>('newest');
   const [notifications, setNotifications] = useState<Notif[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -144,7 +146,7 @@ function App() {
   const [showProfile, setShowProfile] = useState(false);
   const [profileData, setProfileData] = useState<any>(null);
   const [showCreateAuction, setShowCreateAuction] = useState(false);
-  const [createForm, setCreateForm] = useState({ itemTitle: '', itemImage: '', startingPrice: '1000', durationMinutes: '2', reservePrice: '', buyNowPrice: '', category: 'General', description: '' });
+  const [createForm, setCreateForm] = useState({ itemTitle: '', itemImages: [''], startingPrice: '1000', durationMinutes: '2', reservePrice: '', buyNowPrice: '', category: 'General', description: '', startMode: 'now', startAt: '' });
 
   // ── Extra features state ──
   const [soundMuted, setSoundMuted] = useState(false);
@@ -162,6 +164,7 @@ function App() {
   const [maxBidInput, setMaxBidInput] = useState('');
   const [paidAuctions, setPaidAuctions] = useState<Set<string>>(() => new Set(JSON.parse(localStorage.getItem('paidAuctions') || '[]')));
   const [paymentProcessing, setPaymentProcessing] = useState(false);
+  const [selectedGalleryImage, setSelectedGalleryImage] = useState('');
 
   const markAuctionPaid = (auctionId: string) => {
     setPaidAuctions(prev => {
@@ -246,6 +249,11 @@ function App() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chats]);
+
+  useEffect(() => {
+    const nextImage = auctionState.itemImages?.find(Boolean) || auctionState.itemImage;
+    if (nextImage && nextImage !== selectedGalleryImage) setSelectedGalleryImage(nextImage);
+  }, [auctionState.auctionId, auctionState.itemImage, auctionState.itemImages, selectedGalleryImage]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -505,9 +513,24 @@ function App() {
 
   const handleCreateAuction = (e: React.FormEvent) => {
     e.preventDefault();
-    socket.emit('create_auction', { ...createForm });
+    const cleanedImages = createForm.itemImages.map(img => img.trim()).filter(Boolean).slice(0, 6);
+    const scheduledAt = createForm.startMode === 'scheduled' ? new Date(createForm.startAt).getTime() : undefined;
+    if (cleanedImages.length === 0) {
+      addToast('error', 'Add at least one product image URL.');
+      return;
+    }
+    if (createForm.startMode === 'scheduled' && (!scheduledAt || Number.isNaN(scheduledAt) || scheduledAt < Date.now() + 60_000)) {
+      addToast('error', 'Scheduled auctions must start at least 1 minute later.');
+      return;
+    }
+    socket.emit('create_auction', {
+      ...createForm,
+      itemImage: cleanedImages[0],
+      itemImages: cleanedImages,
+      startAt: createForm.startMode === 'scheduled' && scheduledAt ? new Date(scheduledAt).toISOString() : null,
+    });
     setShowCreateAuction(false);
-    setCreateForm({ itemTitle: '', itemImage: '', startingPrice: '1000', durationMinutes: '2', reservePrice: '', buyNowPrice: '', category: 'General', description: '' });
+    setCreateForm({ itemTitle: '', itemImages: [''], startingPrice: '1000', durationMinutes: '2', reservePrice: '', buyNowPrice: '', category: 'General', description: '', startMode: 'now', startAt: '' });
   };
 
   const startBroadcast = async () => {
@@ -552,6 +575,10 @@ function App() {
     const secs = seconds % 60;
     return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  const galleryImages = (auctionState.itemImages?.filter(Boolean)?.length ? auctionState.itemImages : [auctionState.itemImage]).filter(Boolean);
+  const isUpcoming = auctionState.status === 'Upcoming';
+  const startCountdown = Math.max(0, Math.floor(((auctionState.startTime || Date.now()) - (Date.now() + timeDriftRef.current)) / 1000));
 
   const isUrgent = timeRemaining <= 10 && timeRemaining > 0 && auctionState.status === 'Active';
 
@@ -755,19 +782,41 @@ function App() {
                 <input type="text" required placeholder="e.g. iPhone 14 Pro, Vintage Watch, Handmade Rug..." value={createForm.itemTitle} onChange={ev => setCreateForm(p => ({...p, itemTitle: ev.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-emerald-500/60 outline-none placeholder:text-slate-600 transition-colors" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><ImageIcon className="w-3 h-3" />Product Image URL <span className="text-slate-600">(optional)</span></label>
-                <input type="text" placeholder="https://example.com/image.jpg" value={createForm.itemImage} onChange={ev => setCreateForm(p => ({...p, itemImage: ev.target.value}))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-emerald-500/60 outline-none placeholder:text-slate-600 transition-colors" />
-                {createForm.itemImage && (
-                  <div className="mt-2 relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-700 aspect-video flex items-center justify-center">
-                    <img src={createForm.itemImage} alt="preview" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
-                    <span className="absolute bottom-2 left-3 text-[10px] text-white/50">Preview</span>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><ImageIcon className="w-3 h-3" />Product Images *</label>
+                  <button type="button" onClick={() => setCreateForm(p => ({ ...p, itemImages: [...p.itemImages, ''].slice(0, 6) }))} className="text-[11px] font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40" disabled={createForm.itemImages.length >= 6}>+ Add image</button>
+                </div>
+                <div className="space-y-2">
+                  {createForm.itemImages.map((img, index) => (
+                    <div key={index} className="flex gap-2">
+                      <input type="text" placeholder={`Image URL ${index + 1}`} value={img} onChange={ev => setCreateForm(p => ({ ...p, itemImages: p.itemImages.map((current, i) => i === index ? ev.target.value : current) }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-emerald-500/60 outline-none placeholder:text-slate-600 transition-colors" />
+                      {createForm.itemImages.length > 1 && (
+                        <button type="button" onClick={() => setCreateForm(p => { const nextImages = p.itemImages.filter((_, i) => i !== index); return { ...p, itemImages: nextImages.length ? nextImages : [''] }; })} className="px-3 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-red-400 hover:border-red-500/30 transition-colors">
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {createForm.itemImages.some(Boolean) ? (
+                  <div className="mt-2 space-y-3">
+                    <div className="relative rounded-2xl overflow-hidden bg-slate-950 border border-slate-700 aspect-video flex items-center justify-center">
+                      <img src={createForm.itemImages.find(Boolean)} alt="preview" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none" />
+                      <span className="absolute bottom-2 left-3 text-[10px] text-white/50">Primary cover</span>
+                    </div>
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {createForm.itemImages.filter(Boolean).map((img, index) => (
+                        <div key={img + index} className="aspect-square rounded-xl overflow-hidden border border-white/10 bg-slate-950">
+                          <img src={img} alt={`thumb-${index}`} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                )}
-                {!createForm.itemImage && (
+                ) : (
                   <div className="mt-2 rounded-2xl border border-dashed border-slate-700 aspect-video flex flex-col items-center justify-center gap-2 bg-slate-950/50">
                     <ImageIcon className="w-8 h-8 text-slate-700" />
-                    <p className="text-xs text-slate-600">Image preview will appear here</p>
+                    <p className="text-xs text-slate-600">Add 1–6 image URLs for a gallery preview</p>
                   </div>
                 )}
               </div>
@@ -823,6 +872,25 @@ function App() {
               ))}
             </div>
             <input type="number" min="1" value={createForm.durationMinutes} onChange={ev => setCreateForm(p => ({...p, durationMinutes: ev.target.value}))} placeholder="Or enter custom minutes..." className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm focus:border-emerald-500/60 outline-none placeholder:text-slate-600" />
+          </div>
+
+          <div className="border-t border-slate-800 pt-6">
+            <p className="text-xs font-semibold text-emerald-400 mb-4 flex items-center gap-2"><Clock className="w-3 h-3" />Launch Timing</p>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <button type="button" onClick={() => setCreateForm(p => ({ ...p, startMode: 'now', startAt: '' }))} className={clsx('py-2.5 rounded-xl text-sm font-medium border transition-all', createForm.startMode === 'now' ? 'bg-emerald-600 border-emerald-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}>
+                Go live now
+              </button>
+              <button type="button" onClick={() => setCreateForm(p => ({ ...p, startMode: 'scheduled' }))} className={clsx('py-2.5 rounded-xl text-sm font-medium border transition-all', createForm.startMode === 'scheduled' ? 'bg-violet-600 border-violet-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}>
+                Schedule auction
+              </button>
+            </div>
+            {createForm.startMode === 'scheduled' && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-slate-400">Start date & time</label>
+                <input type="datetime-local" value={createForm.startAt} min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)} onChange={ev => setCreateForm(p => ({ ...p, startAt: ev.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-violet-500/60 outline-none" />
+                <p className="text-xs text-slate-600">Your auction will stay in Upcoming mode until this time.</p>
+              </div>
+            )}
           </div>
 
           {/* Seller tip */}
@@ -952,6 +1020,7 @@ function App() {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
             {[
               { icon: <TrendingUp className="w-4 h-4" />, col: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/40', val: lobbyAuctions.filter(a=>a.status==='Active').length, label: 'Live Now', key: 'active' },
+              { icon: <Timer className="w-4 h-4" />, col: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/40', val: lobbyAuctions.filter(a=>a.status==='Upcoming').length, label: 'Upcoming', key: 'upcoming' },
               { icon: <BarChart2 className="w-4 h-4" />, col: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/40', val: lobbyAuctions.reduce((s,a)=>s+a.bidCount,0), label: 'Total Bids', key: 'all' },
               { icon: <Clock className="w-4 h-4" />, col: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/40', val: lobbyAuctions.filter(a=>a.status==='Active'&&(a.endTime-lobbyNow)<60000).length, label: 'Ending Soon', key: 'ending_soon' },
               { icon: <Trophy className="w-4 h-4" />, col: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/40', val: lobbyAuctions.filter(a=>a.status==='Closed').length, label: 'Ended', key: 'ended' },
@@ -973,6 +1042,7 @@ function App() {
               const matchWatchlist = lobbyTab === 'all' || watchlist.includes(a.id);
               let matchFilter = true;
               if (lobbyFilter === 'active') matchFilter = a.status === 'Active';
+              else if (lobbyFilter === 'upcoming') matchFilter = a.status === 'Upcoming';
               else if (lobbyFilter === 'ending_soon') matchFilter = a.status === 'Active' && (a.endTime - lobbyNow) > 0 && (a.endTime - lobbyNow) < 60000;
               else if (lobbyFilter === 'ended') matchFilter = a.status === 'Closed';
               else if (lobbyFilter === 'buy_now') matchFilter = !!a.buyNowPrice && a.status === 'Active';
@@ -998,6 +1068,7 @@ function App() {
               {featuredAuction && (() => {
                 const fa = featuredAuction;
                 const faEndsIn = fa.endTime - lobbyNow;
+                const faStartsIn = (fa.startTime || lobbyNow) - lobbyNow;
                 const faMins = Math.max(0, Math.floor(faEndsIn / 60000));
                 const faSecs = Math.max(0, Math.floor((faEndsIn % 60000) / 1000));
                 const faEndingSoon = fa.status === 'Active' && faEndsIn > 0 && faEndsIn < 60000;
@@ -1013,10 +1084,10 @@ function App() {
                       <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f1a] via-[#0f0f1a]/30 to-transparent" />
                       {/* Live badge */}
                       <div className="absolute top-4 left-4 flex gap-2">
-                        <span className="flex items-center gap-1.5 bg-green-500/90 backdrop-blur-sm text-white text-[10px] font-semibold px-3 py-1.5 rounded-full shadow-md">
-                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />LIVE AUCTION
+                        <span className={clsx('flex items-center gap-1.5 backdrop-blur-sm text-white text-[10px] font-semibold px-3 py-1.5 rounded-full shadow-md', fa.status === 'Upcoming' ? 'bg-violet-500/90' : 'bg-green-500/90')}>
+                          <span className={clsx('w-1.5 h-1.5 rounded-full', fa.status === 'Upcoming' ? 'bg-white' : 'bg-white animate-pulse')} />{fa.status === 'Upcoming' ? 'UPCOMING AUCTION' : 'LIVE AUCTION'}
                         </span>
-                        {fa.bidCount >= 3 && <span className="bg-orange-500/90 backdrop-blur-sm text-white text-[10px] font-semibold px-3 py-1.5 rounded-full">🔥 HOT</span>}
+                        {fa.status === 'Active' && fa.bidCount >= 3 && <span className="bg-orange-500/90 backdrop-blur-sm text-white text-[10px] font-semibold px-3 py-1.5 rounded-full">🔥 HOT</span>}
                       </div>
                       {/* Watchlist */}
                       <button onClick={e => { e.stopPropagation(); toggleWatchlist(fa.id); }} className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-black/60 transition-all">
@@ -1034,9 +1105,11 @@ function App() {
                           <p className="text-3xl font-bold text-white tabular-nums" style={{fontFamily:"'Space Grotesk',sans-serif"}}>₹{fa.currentBid.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-[10px] text-slate-500 font-medium tracking-widest uppercase mb-0.5">Ends In</p>
-                          <p className={clsx('text-2xl font-bold tabular-nums', faEndingSoon ? 'text-red-400 animate-pulse' : 'text-emerald-400')} style={{fontFamily:"'Space Grotesk',sans-serif"}}>
-                            {faEndsIn > 0 ? `${String(Math.floor(faMins/60)).padStart(2,'0')}h ${String(faMins%60).padStart(2,'0')}m ${String(faSecs).padStart(2,'0')}s` : 'Ended'}
+                          <p className="text-[10px] text-slate-500 font-medium tracking-widest uppercase mb-0.5">{fa.status === 'Upcoming' ? 'Starts In' : 'Ends In'}</p>
+                          <p className={clsx('text-2xl font-bold tabular-nums', fa.status === 'Upcoming' ? 'text-violet-400' : faEndingSoon ? 'text-red-400 animate-pulse' : 'text-emerald-400')} style={{fontFamily:"'Space Grotesk',sans-serif"}}>
+                            {fa.status === 'Upcoming'
+                              ? `${String(Math.floor(Math.max(0, faStartsIn) / 3600000)).padStart(2,'0')}h ${String(Math.floor((Math.max(0, faStartsIn) % 3600000) / 60000)).padStart(2,'0')}m`
+                              : faEndsIn > 0 ? `${String(Math.floor(faMins/60)).padStart(2,'0')}h ${String(faMins%60).padStart(2,'0')}m ${String(faSecs).padStart(2,'0')}s` : 'Ended'}
                           </p>
                         </div>
                         <div className="ml-auto text-right">
@@ -1061,7 +1134,7 @@ function App() {
                         </div>
                       )}
                       <button onClick={() => joinAuction(fa.id)} className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold py-3.5 rounded-xl text-sm transition-all active:scale-[0.98] shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2">
-                        <Zap className="w-4 h-4" /> Place a Bid
+                        <Zap className="w-4 h-4" /> {fa.status === 'Upcoming' ? 'Preview Auction' : 'Place a Bid'}
                       </button>
                     </div>
                   </div>
@@ -1081,9 +1154,11 @@ function App() {
                 {gridAuctions.map(auction => {
                   const catColor = CAT_COLORS[auction.category] || '#3b82f6';
                   const isEndingSoon = auction.status === 'Active' && (auction.endTime - lobbyNow) > 0 && (auction.endTime - lobbyNow) < 60000;
+                  const isUpcomingCard = auction.status === 'Upcoming';
                   const isHot = auction.bidCount >= 3 && auction.status === 'Active';
                   const isNew = !!auction.createdAt && (lobbyNow - auction.createdAt) < 4 * 60 * 1000 && auction.status === 'Active';
                   const timeLeft = auction.endTime - lobbyNow;
+                  const startsIn = (auction.startTime || lobbyNow) - lobbyNow;
                   const tMins = Math.max(0, Math.floor(timeLeft / 60000));
                   const tSecs = Math.max(0, Math.floor((timeLeft % 60000) / 1000));
                   const priceRise = auction.startingPrice > 0 ? Math.round(((auction.currentBid - auction.startingPrice) / auction.startingPrice) * 100) : 0;
@@ -1095,8 +1170,8 @@ function App() {
                     )}>
                       {/* Card image */}
                       <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden">
-                        {auction.itemImage ? (
-                          <img src={auction.itemImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={auction.itemTitle} />
+                        {(auction.itemImages?.[0] || auction.itemImage) ? (
+                          <img src={auction.itemImages?.[0] || auction.itemImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={auction.itemTitle} />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                             <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{background: catColor + '15'}}><TrendingUp className="w-6 h-6" style={{color: catColor}} /></div>
@@ -1105,7 +1180,11 @@ function App() {
                         )}
                         {/* Top-left: time badge */}
                         <div className="absolute top-3 left-3 flex gap-1.5">
-                          {auction.status === 'Active' && timeLeft > 0 ? (
+                          {isUpcomingCard ? (
+                            <span className="flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full backdrop-blur-md bg-violet-500/90 text-white">
+                              <span className="w-1.5 h-1.5 rounded-full bg-white" />STARTS IN {Math.max(0, Math.floor(startsIn / 60000))}M
+                            </span>
+                          ) : auction.status === 'Active' && timeLeft > 0 ? (
                             <span className={clsx('flex items-center gap-1.5 text-[10px] font-semibold px-2.5 py-1 rounded-full backdrop-blur-md', isEndingSoon ? 'bg-red-500/90 text-white animate-pulse' : 'bg-black/60 text-white/90')}>
                               <span className={clsx('w-1.5 h-1.5 rounded-full', isEndingSoon ? 'bg-white animate-ping' : 'bg-green-400')} />
                               {tMins}M {String(tSecs).padStart(2,'0')}S LEFT
@@ -1123,6 +1202,11 @@ function App() {
                         {isHot && (
                           <div className="absolute bottom-3 left-3">
                             <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-orange-500/90 text-white backdrop-blur-md">🔥 HOT</span>
+                          </div>
+                        )}
+                        {auction.itemImages && auction.itemImages.length > 1 && (
+                          <div className="absolute bottom-3 right-3">
+                            <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-black/60 text-white/90 backdrop-blur-md">{auction.itemImages.length} photos</span>
                           </div>
                         )}
                       </div>
@@ -1162,7 +1246,7 @@ function App() {
                         {/* Bid row + button */}
                         <div className="flex items-end justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-[9px] text-slate-500 font-medium tracking-widest uppercase">Current Bid</p>
+                            <p className="text-[9px] text-slate-500 font-medium tracking-widest uppercase">{isUpcomingCard ? 'Starting Bid' : 'Current Bid'}</p>
                             <p className="text-lg font-bold text-white tabular-nums leading-tight" style={{fontFamily:"'Space Grotesk',sans-serif"}}>₹{auction.currentBid?.toLocaleString()}</p>
                             {priceRise > 0 && <p className="text-[10px] text-emerald-400">↑ {priceRise}%</p>}
                             {auction.buyNowPrice && auction.status === 'Active' && (
@@ -1172,11 +1256,11 @@ function App() {
                           <button
                             onClick={() => joinAuction(auction.id)}
                             className={clsx('flex-shrink-0 font-semibold px-4 py-2 rounded-lg text-xs transition-all active:scale-95',
-                              auction.status === 'Active' ? 'text-white hover:brightness-110 shadow-md' : 'bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300'
+                              auction.status === 'Active' || auction.status === 'Upcoming' ? 'text-white hover:brightness-110 shadow-md' : 'bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300'
                             )}
-                            style={auction.status === 'Active' ? {background: catColor, boxShadow: `0 4px 12px ${catColor}30`} : undefined}
+                            style={auction.status === 'Active' || auction.status === 'Upcoming' ? {background: catColor, boxShadow: `0 4px 12px ${catColor}30`} : undefined}
                           >
-                            {auction.status === 'Active' ? 'Bid Now' : 'Results'}
+                            {auction.status === 'Upcoming' ? 'Preview' : auction.status === 'Active' ? 'Bid Now' : 'Results'}
                           </button>
                         </div>
 
@@ -1359,6 +1443,15 @@ function App() {
         </div>
       )}
 
+      {isUpcoming && (
+        <div className="w-full bg-violet-600/15 border-b border-violet-500/20">
+          <div className="max-w-7xl mx-auto px-6 py-2 flex items-center justify-between gap-3 text-xs">
+            <span className="text-violet-300 font-medium">Upcoming auction • starts in {formatTime(startCountdown)}</span>
+            <span className="text-violet-400/70">Bidding unlocks automatically at launch time</span>
+          </div>
+        </div>
+      )}
+
       <main className="relative max-w-7xl mx-auto px-6 py-8 grid grid-cols-12 gap-6 z-10">
         <div className="col-span-12 lg:col-span-3 space-y-6">
            <div className="bg-slate-900/50 backdrop-blur-md border border-violet-900/25 rounded-3xl overflow-hidden shadow-2xl relative group">
@@ -1401,13 +1494,25 @@ function App() {
 
               <div className="aspect-square bg-slate-950 p-4 border-b border-slate-800/50">
                  <div className="w-full h-full rounded-2xl overflow-hidden relative shadow-[inset_0_0_20px_rgba(0,0,0,0.8)] flex items-center justify-center bg-slate-900">
-                    {auctionState.itemImage ? (
-                       <img src={auctionState.itemImage} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" alt="Lot" />
+                    {selectedGalleryImage ? (
+                       <img src={selectedGalleryImage} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" alt="Lot" />
                     ) : (
                        <div className="text-slate-700 font-black tracking-widest italic opacity-50">IMAGE PENDING</div>
                     )}
                  </div>
               </div>
+
+              {galleryImages.length > 1 && (
+                <div className="px-4 pb-4 border-b border-slate-800/50">
+                  <div className="grid grid-cols-5 gap-2">
+                    {galleryImages.slice(0, 5).map((img, index) => (
+                      <button key={img + index} onClick={() => setSelectedGalleryImage(img)} className={clsx('aspect-square rounded-xl overflow-hidden border transition-all', selectedGalleryImage === img ? 'border-violet-500 ring-1 ring-violet-500/50' : 'border-white/10 hover:border-white/20')}>
+                        <img src={img} alt={`gallery-${index}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="p-6 space-y-6">
                  <div className="grid grid-cols-2 gap-4">
@@ -1455,10 +1560,18 @@ function App() {
                    </button>
                  )}
 
+                 {isUpcoming && (
+                   <div className="w-full bg-violet-500/10 border border-violet-500/20 rounded-2xl p-4 text-center">
+                     <p className="text-xs text-violet-300 font-medium">This auction is scheduled.</p>
+                     <p className="text-2xl font-bold text-white mt-1 tabular-nums" style={{fontFamily:"'Space Grotesk',sans-serif"}}>{formatTime(startCountdown)}</p>
+                     <p className="text-[10px] text-slate-500 mt-1">Bidding and Buy Now will unlock when it goes live.</p>
+                   </div>
+                 )}
+
                  {/* Bid increment presets */}
                  <div className="grid grid-cols-4 gap-2">
                    {[100, 500, 1000, 5000].map(inc => (
-                     <button key={inc} onClick={() => { const next = (auctionState.currentBid || auctionState.startingPrice) + inc; socket.emit('place_bid', { auctionId: auctionState.auctionId, amount: next }); }} disabled={auctionState.status === 'Closed'} className="bg-white/5 hover:bg-violet-600 border border-white/10 hover:border-violet-500 text-white font-medium py-2 rounded-lg text-sm transition-all disabled:opacity-30 active:scale-95">
+                     <button key={inc} onClick={() => { const next = (auctionState.currentBid || auctionState.startingPrice) + inc; socket.emit('place_bid', { auctionId: auctionState.auctionId, amount: next }); }} disabled={auctionState.status !== 'Active'} className="bg-white/5 hover:bg-violet-600 border border-white/10 hover:border-violet-500 text-white font-medium py-2 rounded-lg text-sm transition-all disabled:opacity-30 active:scale-95">
                        +{inc >= 1000 ? `${inc/1000}k` : inc}
                      </button>
                    ))}
@@ -1609,7 +1722,7 @@ function App() {
                     </div>
                     <button 
                       type="submit"
-                      disabled={auctionState.status === 'Closed'}
+                      disabled={auctionState.status !== 'Active'}
                       className="px-8 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl shadow-lg shadow-violet-500/20 hover:scale-[1.02] active:scale-95 transition-all text-lg disabled:opacity-30"
                     >
                        Bid

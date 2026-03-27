@@ -58,13 +58,14 @@ app.post('/api/auth/google', async (req, res) => {
     const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: GOOGLE_CLIENT_ID });
     const payload = ticket.getPayload();
     if (!payload?.email) return res.status(400).json({ error: 'Invalid Google token' });
-    let user = db.data.users.find((u: any) => u.email === payload.email);
+    const email = payload.email;
+    let user = db.data.users.find((u: any) => u.email === email);
     if (!user) {
-      const baseName = (payload.name || payload.email.split('@')[0]).replace(/\s+/g, '_').toLowerCase();
+      const baseName = (payload.name || email.split('@')[0] || 'google_user').replace(/\s+/g, '_').toLowerCase();
       const username = db.data.users.find((u: any) => u.username === baseName)
         ? `${baseName}_${Date.now().toString(36)}`
         : baseName;
-      user = { id: uuidv4(), username, email: payload.email, password: '', googleId: payload.sub };
+      user = { id: uuidv4(), username, email, password: '', googleId: payload.sub || '' };
       db.data.users.push(user);
       await db.write();
     }
@@ -96,11 +97,14 @@ app.get('/api/auctions/:id/bids', (req, res) => {
 app.get('/api/auctions', (_req, res) => {
   const auctions = db.data.auctions.map(a => ({
     id: a.id, itemTitle: a.itemTitle, itemImage: a.itemImage,
+    itemImages: a.itemImages ?? [a.itemImage],
     startingPrice: a.startingPrice, currentBid: a.currentBid,
     highestBidderId: a.highestBidderId, status: a.status, endTime: a.endTime,
+    startTime: a.startTime ?? a.createdAt ?? Date.now(),
     reservePrice: a.reservePrice ?? null, buyNowPrice: a.buyNowPrice ?? null,
     category: a.category ?? 'General', createdBy: a.createdBy ?? 'system',
     bidCount: db.data.bids.filter(b => b.auctionId === a.id).length,
+    description: a.description ?? '',
     createdAt: (a as any).createdAt ?? a.endTime,
   }));
   res.json(auctions);
@@ -261,13 +265,14 @@ async function processQueue() {
       const history = db.data.bids.filter(b => b.auctionId === auctionId).sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
       const auctionUpdate = {
         itemTitle: auction.itemTitle, itemImage: auction.itemImage,
+        itemImages: auction.itemImages ?? [auction.itemImage],
         currentBid: auction.currentBid, startingPrice: auction.startingPrice,
         highestBidderId: auction.highestBidderId, status: auction.status,
         endTime: auction.endTime, reservePrice: auction.reservePrice ?? null, buyNowPrice: auction.buyNowPrice ?? null,
-        history: history.map(h => ({ userId: h.userId, amount: h.amount })), auctionId, serverTimestamp: Date.now(),
+        history: history.map(h => ({ userId: h.userId, amount: h.amount })), auctionId, startTime: auction.startTime ?? Date.now(), serverTimestamp: Date.now(),
       };
       io.to(`auction:${auctionId}`).emit('auction_updated', auctionUpdate);
-      io.emit('lobby_auction_update', { id: auctionId, currentBid: auction.currentBid, highestBidderId: auction.highestBidderId, status: auction.status, endTime: auction.endTime, bidCount: db.data.bids.filter(b => b.auctionId === auctionId).length });
+      io.emit('lobby_auction_update', { id: auctionId, currentBid: auction.currentBid, highestBidderId: auction.highestBidderId, status: auction.status, endTime: auction.endTime, startTime: auction.startTime ?? Date.now(), bidCount: db.data.bids.filter(b => b.auctionId === auctionId).length });
     } catch (err) { console.error('Error processing bid:', err); }
   }
   isProcessing = false;
@@ -313,11 +318,12 @@ io.on('connection', (socket) => {
       const recentChats = db.data.chats.filter(c => c.auctionId === auction!.id).sort((a, b) => a.timestamp - b.timestamp).slice(-30);
       socket.emit('auction_state', {
         itemTitle: auction.itemTitle, itemImage: auction.itemImage,
+        itemImages: auction.itemImages ?? [auction.itemImage],
         currentBid: auction.currentBid, startingPrice: auction.startingPrice,
         highestBidderId: auction.highestBidderId, status: auction.status,
         endTime: auction.endTime, reservePrice: auction.reservePrice ?? null, buyNowPrice: auction.buyNowPrice ?? null,
         history: history.map(h => ({ userId: h.userId, amount: h.amount })),
-        auctionId: auction.id, serverTimestamp: Date.now(), recentChats,
+        auctionId: auction.id, startTime: auction.startTime ?? auction.createdAt ?? Date.now(), serverTimestamp: Date.now(), recentChats,
         description: (auction as any).description || '',
       });
     } catch (err) { console.error('join_auction error:', err); }
@@ -365,22 +371,32 @@ io.on('connection', (socket) => {
     const history = db.data.bids.filter(b => b.auctionId === auctionId).sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
     io.to(`auction:${auctionId}`).emit('auction_updated', {
       itemTitle: auction.itemTitle, itemImage: auction.itemImage,
+      itemImages: auction.itemImages ?? [auction.itemImage],
       currentBid: auction.currentBid, startingPrice: auction.startingPrice,
       highestBidderId: auction.highestBidderId, status: auction.status,
       endTime: auction.endTime, reservePrice: auction.reservePrice ?? null, buyNowPrice: auction.buyNowPrice ?? null,
-      history: history.map(h => ({ userId: h.userId, amount: h.amount })), auctionId, serverTimestamp: Date.now(),
+      history: history.map(h => ({ userId: h.userId, amount: h.amount })), auctionId, startTime: auction.startTime ?? Date.now(), serverTimestamp: Date.now(),
     });
-    io.emit('lobby_auction_update', { id: auctionId, currentBid: auction.currentBid, highestBidderId: auction.highestBidderId, status: auction.status, endTime: auction.endTime, bidCount: db.data.bids.filter(b => b.auctionId === auctionId).length });
+    io.emit('lobby_auction_update', { id: auctionId, currentBid: auction.currentBid, highestBidderId: auction.highestBidderId, status: auction.status, endTime: auction.endTime, startTime: auction.startTime ?? Date.now(), bidCount: db.data.bids.filter(b => b.auctionId === auctionId).length });
   });
 
   socket.on('create_auction', async (data) => {
-    const { itemTitle, itemImage, startingPrice, durationMinutes, reservePrice, buyNowPrice, category, description } = data;
+    const { itemTitle, itemImage, itemImages, startingPrice, durationMinutes, reservePrice, buyNowPrice, category, description, startAt } = data;
+    const cleanedImages = Array.isArray(itemImages)
+      ? itemImages.map((img: string) => img?.trim()).filter(Boolean).slice(0, 6)
+      : [itemImage].filter(Boolean);
+    const primaryImage = cleanedImages[0] || itemImage || 'https://images.unsplash.com/photo-1587836374828-cb4387dfee7d?auto=format&fit=crop&q=80&w=400&h=400';
+    const parsedStart = startAt ? new Date(startAt).getTime() : Date.now();
+    const safeStart = Number.isFinite(parsedStart) && parsedStart > Date.now() + 30000 ? parsedStart : Date.now();
+    const isScheduled = safeStart > Date.now() + 10000;
     const auction = {
       id: uuidv4(), itemTitle, createdBy: user.username,
-      itemImage: itemImage || 'https://images.unsplash.com/photo-1587836374828-cb4387dfee7d?auto=format&fit=crop&q=80&w=400&h=400',
+      itemImage: primaryImage,
+      itemImages: cleanedImages.length ? cleanedImages : [primaryImage],
       startingPrice: Number(startingPrice) || 1000, currentBid: Number(startingPrice) || 1000,
-      highestBidderId: 'None', status: 'Active' as const,
-      endTime: Date.now() + (Number(durationMinutes) || 2) * 60000,
+      highestBidderId: 'None', status: isScheduled ? 'Upcoming' : 'Active',
+      startTime: safeStart,
+      endTime: safeStart + (Number(durationMinutes) || 2) * 60000,
       createdAt: Date.now(),
       category: category || 'General', reservePrice: reservePrice ? Number(reservePrice) : null, buyNowPrice: buyNowPrice ? Number(buyNowPrice) : null,
       description: description || '',
@@ -393,15 +409,16 @@ io.on('connection', (socket) => {
   socket.on('restart_auction', async ({ auctionId, durationMinutes }) => {
     const auction = db.data.auctions.find(a => a.id === auctionId);
     if (!auction) return;
-    auction.status = 'Active'; auction.endTime = Date.now() + (Number(durationMinutes) || 2) * 60000;
+    auction.status = 'Active'; auction.startTime = Date.now(); auction.endTime = Date.now() + (Number(durationMinutes) || 2) * 60000;
     auction.currentBid = auction.startingPrice; auction.highestBidderId = 'None';
     await db.write();
     io.to(`auction:${auctionId}`).emit('auction_updated', {
       itemTitle: auction.itemTitle, itemImage: auction.itemImage,
+      itemImages: auction.itemImages ?? [auction.itemImage],
       currentBid: auction.currentBid, startingPrice: auction.startingPrice,
       highestBidderId: auction.highestBidderId, status: auction.status,
       endTime: auction.endTime, reservePrice: auction.reservePrice ?? null, buyNowPrice: auction.buyNowPrice ?? null,
-      history: [], auctionId, serverTimestamp: Date.now(),
+      history: [], auctionId, startTime: auction.startTime ?? Date.now(), serverTimestamp: Date.now(),
     });
   });
 
@@ -414,10 +431,11 @@ io.on('connection', (socket) => {
     const history = db.data.bids.filter(b => b.auctionId === auctionId).sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
     io.to(`auction:${auctionId}`).emit('auction_updated', {
       itemTitle: auction.itemTitle, itemImage: auction.itemImage,
+      itemImages: auction.itemImages ?? [auction.itemImage],
       currentBid: auction.currentBid, startingPrice: auction.startingPrice,
       highestBidderId: auction.highestBidderId, status: auction.status,
       endTime: auction.endTime, reservePrice: auction.reservePrice ?? null, buyNowPrice: auction.buyNowPrice ?? null,
-      history: history.map(h => ({ userId: h.userId, amount: h.amount })), auctionId, serverTimestamp: Date.now(),
+      history: history.map(h => ({ userId: h.userId, amount: h.amount })), auctionId, startTime: auction.startTime ?? Date.now(), serverTimestamp: Date.now(),
     });
     io.emit('lobby_auction_update', { id: auctionId, currentBid: auction.currentBid, highestBidderId: auction.highestBidderId, status: auction.status, endTime: auction.endTime, bidCount: db.data.bids.filter(b => b.auctionId === auctionId).length });
   });
@@ -455,10 +473,11 @@ io.on('connection', (socket) => {
     const history = db.data.bids.filter(b => b.auctionId === auctionId).sort((a, b) => b.timestamp - a.timestamp).slice(0, 5);
     io.to(`auction:${auctionId}`).emit('auction_updated', {
       itemTitle: auction.itemTitle, itemImage: auction.itemImage,
+      itemImages: auction.itemImages ?? [auction.itemImage],
       currentBid: auction.currentBid, startingPrice: auction.startingPrice,
       highestBidderId: auction.highestBidderId, status: auction.status,
       endTime: auction.endTime, reservePrice: auction.reservePrice ?? null, buyNowPrice: auction.buyNowPrice ?? null,
-      history: history.map(h => ({ userId: h.userId, amount: h.amount })), auctionId, serverTimestamp: Date.now(),
+      history: history.map(h => ({ userId: h.userId, amount: h.amount })), auctionId, startTime: auction.startTime ?? Date.now(), serverTimestamp: Date.now(),
     });
   });
 });
@@ -467,17 +486,33 @@ setInterval(async () => {
   const now = Date.now();
   let changed = false;
   for (const auction of db.data.auctions) {
+    if (auction.status === 'Upcoming' && (auction.startTime ?? now) <= now) {
+      auction.status = 'Active';
+      changed = true;
+      const history = db.data.bids.filter((b: any) => b.auctionId === auction.id).sort((a: any, b: any) => b.timestamp - a.timestamp).slice(0, 5).map((h: any) => ({ userId: h.userId, amount: h.amount }));
+      io.to(`auction:${auction.id}`).emit('auction_updated', {
+        itemTitle: auction.itemTitle, itemImage: auction.itemImage,
+        itemImages: auction.itemImages ?? [auction.itemImage],
+        currentBid: auction.currentBid, startingPrice: auction.startingPrice,
+        highestBidderId: auction.highestBidderId, status: 'Active',
+        endTime: auction.endTime, reservePrice: auction.reservePrice ?? null, buyNowPrice: auction.buyNowPrice ?? null,
+        history, auctionId: auction.id, startTime: auction.startTime ?? now, serverTimestamp: now,
+        description: auction.description || '',
+      });
+      io.emit('lobby_auction_update', { id: auction.id, currentBid: auction.currentBid, highestBidderId: auction.highestBidderId, status: 'Active', endTime: auction.endTime, startTime: auction.startTime ?? now, bidCount: db.data.bids.filter((b: any) => b.auctionId === auction.id).length });
+    }
     if (auction.status === 'Active' && auction.endTime < now) {
       auction.status = 'Closed'; changed = true;
       const history = db.data.bids.filter((b: any) => b.auctionId === auction.id).sort((a: any, b: any) => b.timestamp - a.timestamp).slice(0, 5).map((h: any) => ({ userId: h.userId, amount: h.amount }));
       io.to(`auction:${auction.id}`).emit('auction_updated', {
         itemTitle: auction.itemTitle, itemImage: auction.itemImage,
+        itemImages: auction.itemImages ?? [auction.itemImage],
         currentBid: auction.currentBid, startingPrice: auction.startingPrice,
         highestBidderId: auction.highestBidderId, status: 'Closed',
         endTime: auction.endTime, reservePrice: auction.reservePrice ?? null, buyNowPrice: auction.buyNowPrice ?? null,
-        history, auctionId: auction.id, serverTimestamp: now,
+        history, auctionId: auction.id, startTime: auction.startTime ?? now, serverTimestamp: now,
       });
-      io.emit('lobby_auction_update', { id: auction.id, currentBid: auction.currentBid, highestBidderId: auction.highestBidderId, status: 'Closed', endTime: auction.endTime, bidCount: db.data.bids.filter((b: any) => b.auctionId === auction.id).length });
+      io.emit('lobby_auction_update', { id: auction.id, currentBid: auction.currentBid, highestBidderId: auction.highestBidderId, status: 'Closed', endTime: auction.endTime, startTime: auction.startTime ?? now, bidCount: db.data.bids.filter((b: any) => b.auctionId === auction.id).length });
     }
   }
   if (changed) await db.write();

@@ -1,5 +1,5 @@
 import { Queue, Worker, Job } from 'bullmq';
-import { redisClient } from './redis';
+import { redisClient } from './redis.js';
 import { Server } from 'socket.io';
 
 let ioInstance: Server | null = null;

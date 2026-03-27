@@ -1,25 +1,31 @@
 import { JSONFilePreset } from 'lowdb/node';
+import type { Low } from 'lowdb';
 
 export type User = {
   id: string;
   username: string;
   email: string;
   password?: string;
+  googleId?: string;
 };
 
 export type Auction = {
   id: string;
   itemTitle: string;
   itemImage: string;
+  itemImages?: string[];
   startingPrice: number;
   currentBid: number;
   highestBidderId: string;
-  status: 'Active' | 'Closed';
+  status: 'Upcoming' | 'Active' | 'Closed' | 'Cancelled';
+  startTime?: number;
   endTime: number;
   category?: string;
   reservePrice?: number | null;
   buyNowPrice?: number | null;
   createdBy?: string;
+  description?: string;
+  createdAt?: number;
 };
 
 export type Bid = {
@@ -59,7 +65,7 @@ export type Data = {
 
 const defaultData: Data = { users: [], auctions: [], bids: [], chats: [], payments: [] };
 
-export const getDB = async () => {
+export const getDB = async (): Promise<Low<Data>> => {
   const db = await JSONFilePreset<Data>('db.json', defaultData);
   if (!db.data.chats) (db.data as any).chats = [];
   if (!db.data.payments) (db.data as any).payments = [];
