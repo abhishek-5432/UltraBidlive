@@ -1,14 +1,19 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { socket, connectSocket } from './lib/socket';
-import { Trophy, Play, Video, Edit2, Clock, TrendingUp, Users, Lock, User, Mail, ArrowRight, MessageSquare, ChevronLeft, Plus, X, Star, Heart, ShoppingCart, Zap, Volume2, VolumeX, Copy, Check, Search, BarChart2, Bell, Trash2, Timer, Tag, Package, ImageIcon, IndianRupee, ListChecks, CreditCard, Mic, MicOff, RefreshCw, Camera } from 'lucide-react';
+import { Trophy, Play, Video, Edit2, Clock, TrendingUp, Users, Lock, User, Mail, ArrowRight, MessageSquare, ChevronLeft, Plus, X, Star, Heart, ShoppingCart, Zap, Volume2, VolumeX, Copy, Check, Search, BarChart2, Bell, Trash2, Timer, Tag, Package, ImageIcon, IndianRupee, ListChecks, CreditCard, Mic, MicOff, RefreshCw, Camera, ShieldCheck, ShieldAlert, Download, Truck, RotateCcw, ExternalLink, FileText } from 'lucide-react';
 import clsx from 'clsx';
 
 // ── Types ──────────────────────────────────────────────────────────
-interface AuctionCard { id: string; itemTitle: string; itemImage: string; itemImages?: string[]; startingPrice: number; currentBid: number; highestBidderId: string; status: string; startTime?: number; endTime: number; bidCount: number; category: string; buyNowPrice: number | null; createdBy?: string; description?: string; createdAt?: number; }
+interface AuctionCard { id: string; itemTitle: string; itemImage: string; itemImages?: string[]; startingPrice: number; currentBid: number; highestBidderId: string; status: string; startTime?: number; endTime: number; bidCount: number; category: string; buyNowPrice: number | null; createdBy?: string; description?: string; createdAt?: number; moderationStatus?: 'Approved' | 'Pending' | 'Flagged'; moderationNotes?: string | null; sellerTrustScore?: number; sellerTrustLabel?: string; sellerVerified?: boolean; }
 interface ChatMsg { id: string; userId: string; message: string; timestamp: number; }
 interface Toast { id: string; type: 'outbid' | 'win' | 'error' | 'info'; message: string; }
 interface Notif { id: string; type: 'outbid' | 'win' | 'info'; message: string; read: boolean; timestamp: number; }
 interface AuthUser { id?: string; username: string; email?: string; }
+interface OrderAddress { fullName: string; phone: string; line1: string; line2?: string; city: string; state: string; postalCode: string; country: string; }
+interface OrderSupportRequest { type: 'cancel' | 'return'; status: 'requested' | 'approved' | 'rejected'; reason: string; sellerNotes?: string | null; requestedAt: number; resolvedAt?: number | null; }
+interface FulfillmentOrder { id: string; auctionId: string; paymentId: string; buyerId: string; sellerId: string; itemTitle: string; amount: number; status: 'paid-awaiting-address' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'returned'; invoiceNumber?: string; estimatedDelivery?: number | null; shippingAddress?: OrderAddress | null; trackingId?: string | null; carrier?: string | null; courierLink?: string | null; shippingLabelUrl?: string | null; notes?: string | null; request?: OrderSupportRequest | null; createdAt: number; updatedAt: number; }
+interface SavedSearch { id: string; userId: string; label: string; query: string; category?: string | null; filter?: 'all' | 'active' | 'upcoming' | 'ending_soon' | 'ended' | 'buy_now' | 'watchlist' | 'mine'; sortBy?: 'newest' | 'bids' | 'ending' | 'price_low' | 'price_high'; notificationsEnabled?: boolean; createdAt: number; }
+interface RecommendationAuction extends AuctionCard { recommendationScore: number; recommendationReason: string; recommendationReasons?: string[]; }
 interface FloatingReaction { id: string; emoji: string; x: number; }
 const REACTION_KEYS = ['FIRE','CLAP','MONEY','WOW','ROCKET'];
 const REACTION_EMOJI: Record<string,string> = { FIRE:'🔥', CLAP:'👏', MONEY:'💰', WOW:'😮', ROCKET:'🚀' };
@@ -63,6 +68,87 @@ function formatDateTimeLocal(timestamp: number) {
   const date = new Date(timestamp - new Date().getTimezoneOffset() * 60000);
   return date.toISOString().slice(0, 16);
 }
+function moderationPill(status?: AuctionCard['moderationStatus']) {
+  if (status === 'Flagged') return { label: 'Flagged Listing', className: 'bg-red-500/15 text-red-300 border border-red-500/30', icon: ShieldAlert };
+  if (status === 'Pending') return { label: 'Needs Review', className: 'bg-amber-500/15 text-amber-300 border border-amber-500/30', icon: ShieldAlert };
+  return { label: 'Trusted Listing', className: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30', icon: ShieldCheck };
+}
+function trustPill(label?: string, verified?: boolean) {
+  if (verified) return { label: label || 'Verified Seller', className: 'bg-sky-500/15 text-sky-300 border border-sky-500/30', icon: ShieldCheck };
+  return { label: label || 'New Seller', className: 'bg-white/5 text-slate-300 border border-white/10', icon: ShieldAlert };
+}
+function formatDateLocal(timestamp: number) {
+  return formatDateTimeLocal(timestamp).slice(0, 10);
+}
+function formatTimeLocal(timestamp: number) {
+  return formatDateTimeLocal(timestamp).slice(11, 16);
+}
+function combineLocalDateTime(date: string, time: string) {
+  return date && time ? `${date}T${time}` : '';
+}
+function to12HourParts(time24: string) {
+  if (!time24) return { hour: '12', minute: '00', period: 'AM' as 'AM' | 'PM' };
+  const [rawHours, rawMinutes] = time24.split(':').map(Number);
+  const period: 'AM' | 'PM' = rawHours >= 12 ? 'PM' : 'AM';
+  const hour12 = ((rawHours + 11) % 12) + 1;
+  return { hour: String(hour12).padStart(2, '0'), minute: String(rawMinutes).padStart(2, '0'), period };
+}
+function to24HourTime(hour12: string, minute: string, period: 'AM' | 'PM') {
+  const normalizedHour = Math.max(1, Math.min(12, Number(hour12) || 12)) % 12;
+  const hours24 = period === 'PM' ? normalizedHour + 12 : normalizedHour;
+  return `${String(hours24).padStart(2, '0')}:${minute}`;
+}
+function formatReadableLocalDateTime(timestamp: number) {
+  return new Date(timestamp).toLocaleString([], {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+function parseLocalDateTime(value: string) {
+  const [datePart, timePart] = value.split('T');
+  if (!datePart || !timePart) return NaN;
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hours, minutes] = timePart.split(':').map(Number);
+  if ([year, month, day, hours, minutes].some(part => Number.isNaN(part))) return NaN;
+  return new Date(year, month - 1, day, hours, minutes, 0, 0).getTime();
+}
+const DEFAULT_ORDER_ADDRESS: OrderAddress = { fullName: '', phone: '', line1: '', line2: '', city: '', state: '', postalCode: '', country: 'India' };
+function createSellerFulfillmentDraft(order?: Partial<FulfillmentOrder>) {
+  return {
+    trackingId: order?.trackingId || '',
+    carrier: order?.carrier || '',
+    notes: order?.notes || '',
+    courierLink: order?.courierLink || '',
+    shippingLabelUrl: order?.shippingLabelUrl || '',
+    estimatedDelivery: order?.estimatedDelivery ? formatDateTimeLocal(order.estimatedDelivery) : '',
+  };
+}
+function formatOrderStatusLabel(status: FulfillmentOrder['status']) {
+  return status.replace(/-/g, ' ');
+}
+function formatEta(timestamp?: number | null) {
+  if (!timestamp) return 'ETA pending';
+  return new Date(timestamp).toLocaleString([], { month: 'short', day: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true });
+}
+function matchesSavedSearchClient(auction: AuctionCard, search: SavedSearch, watchlist: string[], username?: string) {
+  const normalizedQuery = (search.query || '').trim().toLowerCase();
+  const haystack = `${auction.itemTitle || ''} ${auction.description || ''} ${auction.category || ''}`.toLowerCase();
+  const matchQuery = !normalizedQuery || haystack.includes(normalizedQuery);
+  const matchCategory = !search.category || search.category === 'All' || auction.category === search.category;
+  let matchFilter = true;
+  if (search.filter === 'active') matchFilter = auction.status === 'Active';
+  else if (search.filter === 'upcoming') matchFilter = auction.status === 'Upcoming';
+  else if (search.filter === 'ending_soon') matchFilter = auction.status === 'Active' && auction.endTime > Date.now() && auction.endTime - Date.now() < 60_000;
+  else if (search.filter === 'ended') matchFilter = auction.status === 'Closed';
+  else if (search.filter === 'buy_now') matchFilter = !!auction.buyNowPrice && auction.status === 'Active';
+  else if (search.filter === 'watchlist') matchFilter = watchlist.includes(auction.id);
+  else if (search.filter === 'mine') matchFilter = auction.createdBy === username;
+  return matchQuery && matchCategory && matchFilter;
+}
 const CAT_COLORS: Record<string, string> = {
   General:'#3b82f6', Electronics:'#06b6d4', Antiques:'#f59e0b',
   Art:'#ec4899', Jewelry:'#a855f7', Vehicles:'#ef4444', Collectibles:'#10b981',
@@ -73,6 +159,15 @@ const CAT_EMOJIS: Record<string, string> = {
 };
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '646832990645-7opdki9o8ta3t0ge5h0clrdakrf81ncf.apps.googleusercontent.com';
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001';
+
+function getFetchErrorMessage(error: unknown) {
+  if (error instanceof TypeError) {
+    return `Cannot reach the backend at ${BACKEND_URL}. Check VITE_BACKEND_URL, backend deployment, and CORS/network access.`;
+  }
+  if (error instanceof Error) return error.message;
+  return 'Request failed.';
+}
+
 function Sparkline({ data }: { data: number[] }) {
   if (data.length < 2) return <div className="h-10 flex items-center justify-center text-[10px] text-slate-600 font-bold">No chart data yet</div>;
   const min = Math.min(...data), max = Math.max(...data), range = max - min || 1;
@@ -134,6 +229,11 @@ function App() {
     buyNowPrice: null as number | null,
     reservePrice: null as number | null,
     description: '',
+    moderationStatus: 'Approved' as 'Approved' | 'Pending' | 'Flagged',
+    moderationNotes: null as string | null,
+    sellerTrustScore: 0,
+    sellerTrustLabel: 'New Seller',
+    sellerVerified: false,
   });
   
   const [bidAmount, setBidAmount] = useState('');
@@ -177,6 +277,8 @@ function App() {
   const [winnerOverlay, setWinnerOverlay] = useState<{ winner: string; amount: number; auctionId: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([]);
+  const [recommendations, setRecommendations] = useState<RecommendationAuction[]>([]);
   const [copiedLink, setCopiedLink] = useState(false);
   const [buyNowModal, setBuyNowModal] = useState(false);
   const [bidFlashKey, setBidFlashKey] = useState(0);
@@ -192,6 +294,21 @@ function App() {
   const [selectedStreamQuality, setSelectedStreamQuality] = useState<'auto' | '720p' | '1080p'>('1080p');
   const [micEnabled, setMicEnabled] = useState(false);
   const [cameraFacingMode, setCameraFacingMode] = useState<'user' | 'environment'>('user');
+  const auctionReminderRef = useRef<Record<string, { soon: boolean; live: boolean; lastStatus?: string }>>({});
+  const savedSearchAlertRef = useRef<Set<string>>(new Set(JSON.parse(localStorage.getItem('savedSearchAlertKeys') || '[]')));
+  const savedSearchAlertPrimedRef = useRef(false);
+  const [orders, setOrders] = useState<FulfillmentOrder[]>([]);
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [addressAuctionId, setAddressAuctionId] = useState('');
+  const [addressForm, setAddressForm] = useState<OrderAddress>(DEFAULT_ORDER_ADDRESS);
+  const [addressSaving, setAddressSaving] = useState(false);
+  const [sellerFulfillmentDrafts, setSellerFulfillmentDrafts] = useState<Record<string, { trackingId: string; carrier: string; notes: string; courierLink: string; shippingLabelUrl: string; estimatedDelivery: string }>>({});
+  const [orderRequestDrafts, setOrderRequestDrafts] = useState<Record<string, string>>({});
+  const [sellerRequestNotes, setSellerRequestNotes] = useState<Record<string, string>>({});
+  const [browserAlertsEnabled, setBrowserAlertsEnabled] = useState(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return false;
+    return Notification.permission === 'granted' && localStorage.getItem('browserAlertsEnabled') !== 'false';
+  });
 
   const markAuctionPaid = (auctionId: string) => {
     setPaidAuctions(prev => {
@@ -199,6 +316,221 @@ function App() {
       localStorage.setItem('paidAuctions', JSON.stringify([...next]));
       return next;
     });
+  };
+
+  const loadOrders = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/orders`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      setOrders(data || []);
+      const awaitingAddress = (data || []).find((order: FulfillmentOrder) => order.buyerId === myUser?.username && order.status === 'paid-awaiting-address');
+      if (awaitingAddress) {
+        setAddressAuctionId(awaitingAddress.auctionId);
+        setAddressForm(awaitingAddress.shippingAddress || DEFAULT_ORDER_ADDRESS);
+        setShowAddressModal(true);
+      }
+    } catch {}
+  }, [myUser?.username]);
+
+  const loadSavedSearches = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/saved-searches`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      setSavedSearches(data || []);
+    } catch {}
+  }, []);
+
+  const loadRecommendations = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const watchlistParam = encodeURIComponent(watchlist.join(','));
+      const res = await fetch(`${BACKEND_URL}/api/recommendations?watchlist=${watchlistParam}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      setRecommendations(data || []);
+    } catch {}
+  }, [watchlist]);
+
+  const applySavedSearch = (search: SavedSearch) => {
+    setSearchQuery(search.query || '');
+    setCategoryFilter(search.category || 'All');
+    setLobbyFilter(search.filter || 'all');
+    setSortBy(search.sortBy || 'newest');
+    setLobbyTab(search.filter === 'watchlist' ? 'watchlist' : 'all');
+    addToast('info', `Applied saved search: ${search.label}`);
+  };
+
+  const saveCurrentSearch = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    if (!searchQuery.trim() && categoryFilter === 'All' && lobbyFilter === 'all') {
+      addToast('error', 'Set a keyword, category, or filter before saving a search.');
+      return;
+    }
+    const labelParts = [searchQuery.trim(), categoryFilter !== 'All' ? categoryFilter : '', lobbyFilter !== 'all' ? lobbyFilter.replace(/_/g, ' ') : ''].filter(Boolean);
+    const label = labelParts.join(' · ') || `Search ${savedSearches.length + 1}`;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/saved-searches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ label, query: searchQuery.trim(), category: categoryFilter === 'All' ? null : categoryFilter, filter: lobbyFilter, sortBy, notificationsEnabled: browserAlertsEnabled }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save search.');
+      setSavedSearches(prev => [data, ...prev]);
+      const nextAlertKeys = new Set(savedSearchAlertRef.current);
+      lobbyAuctions.forEach(auction => {
+        if (matchesSavedSearchClient(auction, data, watchlist, myUser?.username)) nextAlertKeys.add(`${data.id}:${auction.id}`);
+      });
+      savedSearchAlertRef.current = nextAlertKeys;
+      localStorage.setItem('savedSearchAlertKeys', JSON.stringify([...nextAlertKeys].slice(-200)));
+      addToast('info', `Saved search: ${data.label}`);
+      void loadRecommendations();
+    } catch (err: any) {
+      addToast('error', err.message || 'Could not save search.');
+    }
+  };
+
+  const deleteSavedSearch = async (searchId: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/saved-searches/${searchId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not remove saved search.');
+      setSavedSearches(prev => prev.filter(search => search.id !== searchId));
+      const nextAlertKeys = [...savedSearchAlertRef.current].filter(key => !key.startsWith(`${searchId}:`));
+      savedSearchAlertRef.current = new Set(nextAlertKeys);
+      localStorage.setItem('savedSearchAlertKeys', JSON.stringify(nextAlertKeys.slice(-200)));
+      addToast('info', 'Saved search removed.');
+      void loadRecommendations();
+    } catch (err: any) {
+      addToast('error', err.message || 'Could not remove saved search.');
+    }
+  };
+
+  const submitShippingAddress = async (auctionId: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    setAddressSaving(true);
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/orders/${auctionId}/address`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(addressForm),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save address.');
+      setOrders(prev => [data, ...prev.filter(order => order.id !== data.id)]);
+      setShowAddressModal(false);
+      addToast('info', 'Delivery address submitted successfully.');
+    } catch (err: any) {
+      addToast('error', err.message || 'Could not save address.');
+    } finally {
+      setAddressSaving(false);
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, status?: FulfillmentOrder['status']) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const existingOrder = orders.find(order => order.id === orderId);
+    const draft = sellerFulfillmentDrafts[orderId] || createSellerFulfillmentDraft(existingOrder);
+    const estimatedDelivery = draft.estimatedDelivery ? parseLocalDateTime(draft.estimatedDelivery) : null;
+    if (draft.estimatedDelivery && Number.isNaN(estimatedDelivery)) {
+      addToast('error', 'Please enter a valid estimated delivery date and time.');
+      return;
+    }
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/orders/${orderId}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ status, trackingId: draft.trackingId, carrier: draft.carrier, notes: draft.notes, courierLink: draft.courierLink, shippingLabelUrl: draft.shippingLabelUrl, estimatedDelivery }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update order.');
+      setOrders(prev => [data, ...prev.filter(order => order.id !== data.id)]);
+      addToast('info', status ? `Order marked as ${status}.` : 'Shipping details saved.');
+    } catch (err: any) {
+      addToast('error', err.message || 'Could not update order.');
+    }
+  };
+
+  const downloadInvoice = async (orderId: string, itemTitle: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/orders/${orderId}/invoice`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Could not download invoice.');
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${itemTitle.toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'invoice'}.html`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      addToast('info', 'Invoice downloaded.');
+    } catch (err: any) {
+      addToast('error', err.message || 'Could not download invoice.');
+    }
+  };
+
+  const submitOrderRequest = async (orderId: string, type: OrderSupportRequest['type']) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    const reason = (orderRequestDrafts[orderId] || '').trim();
+    if (!reason) {
+      addToast('error', `Please provide a reason for the ${type} request.`);
+      return;
+    }
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/orders/${orderId}/request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ type, reason }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not submit request.');
+      setOrders(prev => [data, ...prev.filter(order => order.id !== data.id)]);
+      setOrderRequestDrafts(prev => ({ ...prev, [orderId]: '' }));
+      addToast('info', `${type === 'cancel' ? 'Cancellation' : 'Return'} request submitted.`);
+    } catch (err: any) {
+      addToast('error', err.message || 'Could not submit request.');
+    }
+  };
+
+  const resolveOrderRequest = async (orderId: string, action: 'approve' | 'reject') => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/orders/${orderId}/request/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ action, sellerNotes: sellerRequestNotes[orderId] || '' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update request.');
+      setOrders(prev => [data, ...prev.filter(order => order.id !== data.id)]);
+      setSellerRequestNotes(prev => ({ ...prev, [orderId]: '' }));
+      addToast('info', `Request ${action}d successfully.`);
+    } catch (err: any) {
+      addToast('error', err.message || 'Could not update request.');
+    }
   };
 
   const handleRazorpayPayment = async (auctionId: string) => {
@@ -232,7 +564,7 @@ function App() {
               markAuctionPaid(auctionId);
               setWinnerOverlay(null);
               addToast('win', `✅ Payment successful! ID: ${response.razorpay_payment_id}`);
-              setNotifications(prev => [{ id: uid(), type: 'win', message: `💳 Payment confirmed for auction — ₹${(data.amount/100).toLocaleString()}`, read: false, timestamp: Date.now() }, ...prev.slice(0, 49)]);
+              pushNotification('win', `💳 Payment confirmed for auction — ₹${(data.amount/100).toLocaleString()}`);
             } else { addToast('error', vData.error || 'Payment verification failed'); }
           } catch { addToast('error', 'Payment verification error'); }
           setPaymentProcessing(false);
@@ -259,23 +591,140 @@ function App() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
   }, []);
 
+  const requestBrowserAlerts = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      addToast('error', 'Browser alerts are not supported on this device.');
+      return false;
+    }
+    const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+    const enabled = permission === 'granted';
+    setBrowserAlertsEnabled(enabled);
+    localStorage.setItem('browserAlertsEnabled', enabled ? 'true' : 'false');
+    addToast(enabled ? 'info' : 'error', enabled ? 'Browser alerts enabled.' : 'Browser alerts permission denied.');
+    return enabled;
+  }, [addToast]);
+
+  const sendBrowserAlert = useCallback((type: Notif['type'], message: string) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (!browserAlertsEnabled || Notification.permission !== 'granted') return;
+    const title = type === 'outbid' ? 'UltraBid • Outbid Alert' : type === 'win' ? 'UltraBid • Winning Alert' : 'UltraBid • Auction Update';
+    const notification = new Notification(title, {
+      body: message,
+      tag: `${type}-${message}`,
+      icon: '/vite.svg',
+      badge: '/vite.svg',
+    });
+    notification.onclick = () => {
+      window.focus();
+      setShowNotifications(true);
+      notification.close();
+    };
+    window.setTimeout(() => notification.close(), 8000);
+  }, [browserAlertsEnabled]);
+
+  const pushNotification = useCallback((type: Notif['type'], message: string) => {
+    setNotifications(prev => [{ id: uid(), type, message, read: false, timestamp: Date.now() }, ...prev.slice(0, 49)]);
+    sendBrowserAlert(type, message);
+  }, [sendBrowserAlert]);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     if (isAuthenticated && view === 'lobby') {
       const fetchAuctions = async () => { try { const r = await fetch(`${BACKEND_URL}/api/auctions`); setLobbyAuctions(await r.json()); } catch {} };
+      const loadDiscovery = async () => {
+        await Promise.all([loadSavedSearches(), loadRecommendations()]);
+      };
       fetchAuctions();
-      const iv = setInterval(fetchAuctions, 10000);
+      loadOrders();
+      loadDiscovery();
+      const iv = setInterval(() => { void fetchAuctions(); void loadRecommendations(); }, 10000);
       // Tick lobby timers every second
       const tick = setInterval(() => setLobbyNow(Date.now()), 1000);
       return () => { clearInterval(iv); clearInterval(tick); };
     }
-  }, [isAuthenticated, view]);
+  }, [isAuthenticated, view, loadOrders, loadRecommendations, loadSavedSearches]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chats]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !myUser) return;
+
+    const relevantIds = new Set<string>();
+
+    for (const auction of lobbyAuctions) {
+      if (!auction.startTime) continue;
+      const isRelevant = auction.createdBy === myUser.username || watchlist.includes(auction.id);
+      if (!isRelevant) continue;
+
+      relevantIds.add(auction.id);
+      const reminderState = auctionReminderRef.current[auction.id] || { soon: false, live: false, lastStatus: auction.status };
+      const startsIn = auction.startTime - lobbyNow;
+
+      if (auction.status === 'Upcoming' && startsIn > 0 && startsIn <= 5 * 60 * 1000 && !reminderState.soon) {
+        const mins = Math.max(1, Math.ceil(startsIn / 60000));
+        const message = `⏰ "${auction.itemTitle}" ${mins === 1 ? 'starts in less than 1 minute' : `starts in ${mins} minutes`}`;
+        addToast('info', message);
+        pushNotification('info', message);
+        reminderState.soon = true;
+      }
+
+      if (reminderState.lastStatus === 'Upcoming' && auction.status === 'Active' && !reminderState.live) {
+        const message = `🚀 "${auction.itemTitle}" is now live — join the auction now!`;
+        addToast('info', message);
+        pushNotification('info', message);
+        reminderState.live = true;
+      }
+
+      reminderState.lastStatus = auction.status;
+      auctionReminderRef.current[auction.id] = reminderState;
+    }
+
+    Object.keys(auctionReminderRef.current).forEach(auctionId => {
+      if (!relevantIds.has(auctionId)) delete auctionReminderRef.current[auctionId];
+    });
+  }, [isAuthenticated, myUser, watchlist, lobbyAuctions, lobbyNow, addToast, pushNotification]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !myUser || savedSearches.length === 0 || lobbyAuctions.length === 0) return;
+
+    if (!savedSearchAlertPrimedRef.current) {
+      const nextKeys = new Set(savedSearchAlertRef.current);
+      for (const auction of lobbyAuctions) {
+        for (const search of savedSearches) {
+          if (!search.notificationsEnabled) continue;
+          if (matchesSavedSearchClient(auction, search, watchlist, myUser.username)) {
+            nextKeys.add(`${search.id}:${auction.id}`);
+          }
+        }
+      }
+      savedSearchAlertRef.current = nextKeys;
+      localStorage.setItem('savedSearchAlertKeys', JSON.stringify([...nextKeys].slice(-200)));
+      savedSearchAlertPrimedRef.current = true;
+      return;
+    }
+
+    const nextKeys = new Set(savedSearchAlertRef.current);
+    for (const auction of lobbyAuctions) {
+      if (auction.createdBy === myUser.username) continue;
+      for (const search of savedSearches) {
+        if (!search.notificationsEnabled) continue;
+        const alertKey = `${search.id}:${auction.id}`;
+        if (nextKeys.has(alertKey)) continue;
+        if (!matchesSavedSearchClient(auction, search, watchlist, myUser.username)) continue;
+        const message = `🔎 New match for saved search "${search.label}": ${auction.itemTitle}`;
+        addToast('info', message);
+        pushNotification('info', message);
+        nextKeys.add(alertKey);
+      }
+    }
+
+    savedSearchAlertRef.current = nextKeys;
+    localStorage.setItem('savedSearchAlertKeys', JSON.stringify([...nextKeys].slice(-200)));
+  }, [isAuthenticated, myUser, savedSearches, lobbyAuctions, watchlist, addToast, pushNotification]);
 
   useEffect(() => {
     const nextImage = auctionState.itemImages?.find(Boolean) || auctionState.itemImage;
@@ -305,8 +754,8 @@ function App() {
           setWinnerOverlay({ winner, amount, auctionId: state.auctionId });
           // Auto-dismiss only if user did NOT win (winner needs to pay)
           if (winner !== myUser?.username) setTimeout(() => setWinnerOverlay(null), 8000);
-          if (winner === myUser?.username) { setTimeout(launchConfetti, 300); addToast('win', `🏆 You won! Rs.${amount?.toLocaleString()} — Pay now to confirm!`); setNotifications(prev => [{ id: uid(), type: 'win', message: `🏆 You won "${state.itemTitle}" — Rs.${amount?.toLocaleString()}! Pay now to confirm.`, read: false, timestamp: Date.now() }, ...prev.slice(0, 49)]); }
-          else { addToast('info', `Auction ended. Winner: ${winner}`); setNotifications(prev => [{ id: uid(), type: 'info', message: `"${state.itemTitle}" ended. Winner: ${winner}`, read: false, timestamp: Date.now() }, ...prev.slice(0, 49)]); }
+          if (winner === myUser?.username) { setTimeout(launchConfetti, 300); addToast('win', `🏆 You won! Rs.${amount?.toLocaleString()} — Pay now to confirm!`); pushNotification('win', `🏆 You won "${state.itemTitle}" — Rs.${amount?.toLocaleString()}! Pay now to confirm.`); }
+          else { addToast('info', `Auction ended. Winner: ${winner}`); pushNotification('info', `"${state.itemTitle}" ended. Winner: ${winner}`); }
         }
         return { ...prev, ...state };
       });
@@ -323,15 +772,16 @@ function App() {
     socket.on('payment_confirmed', ({ auctionId, amount }: { auctionId: string; amount: number }) => {
       markAuctionPaid(auctionId);
       addToast('win', `✅ Payment of ₹${amount?.toLocaleString()} confirmed!`);
+      loadOrders();
     });
     socket.on('seller_payment_received', ({ itemTitle, buyer, amount }: { auctionId: string; itemTitle: string; buyer: string; amount: number }) => {
       addToast('info', `💸 Payment received from ${buyer} for "${itemTitle}" — ₹${amount?.toLocaleString()}`);
-      setNotifications(prev => [{ id: uid(), type: 'info', message: `💸 Payment ₹${amount?.toLocaleString()} received from ${buyer} for "${itemTitle}"`, read: false, timestamp: Date.now() }, ...prev.slice(0, 49)]);
+      pushNotification('info', `💸 Payment ₹${amount?.toLocaleString()} received from ${buyer} for "${itemTitle}"`);
     });
     socket.on('outbid', ({ auctionTitle, newBid }) => {
       if (!soundMutedRef.current) playBeep(880, 440, 0.3);
       addToast('outbid', `You were outbid on "${auctionTitle}"! New: Rs.${newBid?.toLocaleString()}`);
-      setNotifications(prev => [{ id: uid(), type: 'outbid', message: `Outbid on "${auctionTitle}" — Rs.${newBid?.toLocaleString()}`, read: false, timestamp: Date.now() }, ...prev.slice(0, 49)]);
+      pushNotification('outbid', `Outbid on "${auctionTitle}" — Rs.${newBid?.toLocaleString()}`);
     });
     socket.on('bid_error', (msg: string) => addToast('error', msg));
     socket.on('chat_message', (msg: ChatMsg) => setChats(prev => [...prev.slice(-99), msg]));
@@ -340,8 +790,24 @@ function App() {
       setReactions(prev => [...prev, { id, emoji, x }]);
       setTimeout(() => setReactions(prev => prev.filter(r => r.id !== id)), 3000);
     });
-    socket.on('auction_created', (a: AuctionCard) => setLobbyAuctions(prev => [a, ...prev]));
-    socket.on('auction_created_confirm', ({ auctionId, status, startTime }: { auctionId: string; status: string; startTime?: number }) => {
+    socket.on('auction_created', (a: AuctionCard) => {
+      setLobbyAuctions(prev => [a, ...prev]);
+      void loadRecommendations();
+    });
+    socket.on('order_updated', (order: FulfillmentOrder) => {
+      setOrders(prev => [order, ...prev.filter(existing => existing.id !== order.id)]);
+      if (order.buyerId === myUser?.username && order.status === 'paid-awaiting-address') {
+        setAddressAuctionId(order.auctionId);
+        setAddressForm(order.shippingAddress || DEFAULT_ORDER_ADDRESS);
+        setShowAddressModal(true);
+      }
+      if (order.buyerId === myUser?.username && order.status !== 'paid-awaiting-address') addToast('info', `Order update: ${order.itemTitle} is now ${order.status}.`);
+      if (order.sellerId === myUser?.username && order.status === 'processing') addToast('info', `Buyer address received for ${order.itemTitle}.`);
+      if (order.request?.status === 'requested' && order.sellerId === myUser?.username) addToast('info', `${order.request.type === 'cancel' ? 'Cancellation' : 'Return'} request received for ${order.itemTitle}.`);
+    });
+    socket.on('auction_created_confirm', ({ auctionId, status, startTime, moderationStatus, moderationNotes }: { auctionId: string; status: string; startTime?: number; moderationStatus?: AuctionCard['moderationStatus']; moderationNotes?: string | null }) => {
+      if (moderationStatus === 'Flagged') addToast('error', moderationNotes || 'Listing was flagged by the trust layer. Update the title/image to improve trust.');
+      else if (moderationStatus === 'Pending') addToast('info', moderationNotes || 'Listing is pending trust review. Buyers will see a caution badge.');
       if (status === 'Upcoming') {
         setView('lobby');
         addToast('info', `Auction scheduled for ${new Date(startTime || Date.now()).toLocaleString()}`);
@@ -361,7 +827,7 @@ function App() {
     socket.on('auto_bid_placed', ({ auctionTitle, amount }: { auctionId: string; auctionTitle: string; amount: number }) => {
       if (!soundMutedRef.current) playBeep(880, 1100);
       addToast('info', `⚡ Auto-bid placed on "${auctionTitle}" — Rs.${amount?.toLocaleString()}`);
-      setNotifications(prev => [{ id: uid(), type: 'info', message: `⚡ Auto-bid Rs.${amount?.toLocaleString()} placed on "${auctionTitle}"`, read: false, timestamp: Date.now() }, ...prev.slice(0, 49)]);
+      pushNotification('info', `⚡ Auto-bid Rs.${amount?.toLocaleString()} placed on "${auctionTitle}"`);
     });
     socket.on('max_bid_confirmed', ({ auctionId, maxAmount }: { auctionId: string; maxAmount: number | null }) => {
       setMyMaxBids(prev => ({ ...prev, [auctionId]: maxAmount }));
@@ -385,6 +851,7 @@ function App() {
       socket.off('chat_message');
       socket.off('reaction');
       socket.off('auction_created');
+      socket.off('order_updated');
       socket.off('auction_created_confirm');
       socket.off('auction_not_found');
       socket.off('auction_deleted');
@@ -394,7 +861,7 @@ function App() {
       socket.off('payment_confirmed');
       socket.off('seller_payment_received');
     };
-  }, [isAuthenticated, myUser?.username, addToast]);
+  }, [isAuthenticated, myUser?.username, addToast, pushNotification, loadOrders, loadRecommendations]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -476,8 +943,8 @@ function App() {
       localStorage.setItem('user', JSON.stringify(data.user));
       setMyUser(data.user);
       setIsAuthenticated(true);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(getFetchErrorMessage(err));
     }
   };
 
@@ -495,7 +962,7 @@ function App() {
       localStorage.setItem('user', JSON.stringify(data.user));
       setMyUser(data.user);
       setIsAuthenticated(true);
-    } catch (err: any) { setError(err.message); }
+    } catch (err: unknown) { setError(getFetchErrorMessage(err)); }
   }, []);
 
   useEffect(() => {
@@ -523,6 +990,11 @@ function App() {
     localStorage.removeItem('user');
     setIsAuthenticated(false);
     setMyUser(null);
+    localStorage.removeItem('savedSearchAlertKeys');
+    savedSearchAlertRef.current = new Set();
+    savedSearchAlertPrimedRef.current = false;
+    setSavedSearches([]);
+    setRecommendations([]);
     setView('lobby');
     socket.disconnect();
   };
@@ -551,15 +1023,81 @@ function App() {
     setWatchlist(prev => { const n = prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]; localStorage.setItem('watchlist', JSON.stringify(n)); return n; });
   };
 
+  const buildSellerAnalyticsFallback = useCallback((username: string) => {
+    const listings = lobbyAuctions.filter(a => a.createdBy === username);
+    const soldListings = listings.filter(a => a.status === 'Closed' && a.highestBidderId && a.highestBidderId !== 'None');
+    const topAuction = listings
+      .map(a => ({
+        id: a.id,
+        itemTitle: a.itemTitle,
+        amount: a.currentBid,
+        bidCount: a.bidCount,
+        status: a.status,
+      }))
+      .sort((a, b) => (b.amount - a.amount) || (b.bidCount - a.bidCount))[0] || null;
+
+    return {
+      totalListings: listings.length,
+      activeListings: listings.filter(a => a.status === 'Active').length,
+      upcomingListings: listings.filter(a => a.status === 'Upcoming').length,
+      soldListings: soldListings.length,
+      totalRevenue: soldListings.reduce((sum, a) => sum + a.currentBid, 0),
+      potentialRevenue: soldListings.reduce((sum, a) => sum + a.currentBid, 0),
+      totalBidsReceived: listings.reduce((sum, a) => sum + (a.bidCount || 0), 0),
+      uniqueBidders: 0,
+      conversionRate: listings.length ? Math.round((soldListings.length / listings.length) * 100) : 0,
+      topAuction,
+      revenueSeries: listings
+        .slice()
+        .sort((a, b) => (a.startTime ?? a.createdAt ?? a.endTime) - (b.startTime ?? b.createdAt ?? b.endTime))
+        .slice(-8)
+        .map(a => a.status === 'Closed' && a.highestBidderId !== 'None' ? a.currentBid : 0),
+      recentSales: soldListings
+        .slice()
+        .sort((a, b) => b.endTime - a.endTime)
+        .slice(0, 5)
+        .map(a => ({
+          auctionId: a.id,
+          itemTitle: a.itemTitle,
+          amount: a.currentBid,
+          winner: a.highestBidderId,
+          paid: false,
+          timestamp: a.endTime,
+        })),
+    };
+  }, [lobbyAuctions]);
+
   const loadProfile = async () => {
     if (!myUser) return;
-    try { const r = await fetch(`${BACKEND_URL}/api/profile/${myUser.username}`); setProfileData(await r.json()); setShowProfile(true); } catch {}
+    loadOrders();
+    try {
+      const r = await fetch(`${BACKEND_URL}/api/profile/${myUser.username}`);
+      const data = await r.json();
+      const nextUser = data?.email && data.email !== myUser.email ? { ...myUser, email: data.email } : myUser;
+      const fallbackSellerAnalytics = buildSellerAnalyticsFallback(myUser.username);
+      if (nextUser !== myUser) {
+        setMyUser(nextUser);
+        localStorage.setItem('user', JSON.stringify(nextUser));
+      }
+      setProfileData({
+        ...data,
+        email: data?.email || nextUser?.email || myUser.email || '',
+        sellerAnalytics: {
+          ...fallbackSellerAnalytics,
+          ...(data?.sellerAnalytics || {}),
+        },
+      });
+      setShowProfile(true);
+    } catch {
+      setProfileData({ username: myUser.username, email: myUser.email || '', totalBids: 0, wins: 0, bidHistory: [], sellerAnalytics: buildSellerAnalyticsFallback(myUser.username) });
+      setShowProfile(true);
+    }
   };
 
   const handleCreateAuction = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanedImages = createForm.itemImages.map(img => img.trim()).filter(Boolean).slice(0, 6);
-    const scheduledAt = createForm.startMode === 'scheduled' ? new Date(createForm.startAt).getTime() : undefined;
+    const scheduledAt = createForm.startMode === 'scheduled' ? parseLocalDateTime(createForm.startAt) : undefined;
     if (cleanedImages.length === 0) {
       addToast('error', 'Add at least one product image URL.');
       return;
@@ -721,6 +1259,10 @@ function App() {
   const handlePlaceBid = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Submit clicked, current status:", auctionState.status);
+    if (moderationLocked) {
+      addToast('error', 'Bidding is temporarily locked while this listing is under trust review.');
+      return;
+    }
     const amount = parseFloat(bidAmount);
     const minBid = auctionState.currentBid + 100;
     if (amount < minBid) {
@@ -752,6 +1294,14 @@ function App() {
   const startCountdown = Math.max(0, Math.floor(((auctionState.startTime || Date.now()) - (Date.now() + timeDriftRef.current)) / 1000));
 
   const isUrgent = timeRemaining <= 10 && timeRemaining > 0 && auctionState.status === 'Active';
+  const auctionOwner = lobbyAuctions.find(a => a.id === auctionState.auctionId)?.createdBy;
+  const isOwnerViewing = auctionOwner === myUser?.username;
+  const moderationLocked = !isOwnerViewing && auctionState.moderationStatus !== 'Approved';
+  const roomModerationMeta = moderationPill(auctionState.moderationStatus);
+  const roomTrustMeta = trustPill(auctionState.sellerTrustLabel, auctionState.sellerVerified);
+  const RoomModerationIcon = roomModerationMeta.icon;
+  const RoomTrustIcon = roomTrustMeta.icon;
+  const currentOrder = orders.find(order => order.auctionId === auctionState.auctionId);
 
   if (!isAuthenticated) {
      return (
@@ -914,13 +1464,181 @@ function App() {
   );
   const ProfileModal = () => !showProfile || !profileData ? null : (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-      <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 w-full max-w-md shadow-2xl max-h-[80vh] overflow-y-auto">
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 w-full max-w-4xl shadow-2xl max-h-[85vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-white" style={{fontFamily:"'Space Grotesk',sans-serif"}}>My Profile</h2><button onClick={() => setShowProfile(false)} className="p-2 hover:bg-slate-800 rounded-lg"><X className="w-5 h-5 text-slate-400" /></button></div>
-        <div className="flex items-center gap-4 mb-6 p-4 bg-white/[0.03] border border-white/8 rounded-2xl"><div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-md" style={{ background: userColor(profileData.username) }}>{profileData.username?.[0]?.toUpperCase()}</div><div><p className="font-semibold text-white text-lg">{profileData.username}</p>{profileData.email && <p className="text-slate-400 text-xs mt-0.5 break-all">{profileData.email}</p>}<p className="text-slate-500 text-xs mt-1">{profileData.totalBids} bids · {profileData.wins} wins</p></div></div>
+        <div className="flex items-center gap-4 mb-6 p-4 bg-white/[0.03] border border-white/8 rounded-2xl"><div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-md" style={{ background: userColor(profileData.username) }}>{profileData.username?.[0]?.toUpperCase()}</div><div><p className="font-semibold text-white text-lg">{profileData.username}</p>{(profileData.email || myUser?.email) && <p className="text-slate-400 text-xs mt-0.5 break-all">{profileData.email || myUser?.email}</p>}<p className="text-slate-500 text-xs mt-1">{profileData.totalBids} bids · {profileData.wins} wins</p></div></div>
         <div className="grid grid-cols-2 gap-3 mb-6">
           <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4 text-center"><p className="text-2xl font-bold text-violet-400">{profileData.totalBids}</p><p className="text-xs text-slate-500 font-medium mt-1">Total Bids</p></div>
           <div className="bg-white/[0.03] border border-white/8 rounded-xl p-4 text-center"><p className="text-2xl font-bold text-yellow-400">{profileData.wins}</p><p className="text-xs text-slate-500 font-medium mt-1">Auctions Won</p></div>
         </div>
+        {orders.filter(order => order.buyerId === myUser?.username).length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-xs font-semibold text-slate-400 mb-3">My Orders</h3>
+            <div className="space-y-2">
+              {orders.filter(order => order.buyerId === myUser?.username).slice(0, 4).map(order => {
+                const canCancel = ['paid-awaiting-address', 'processing'].includes(order.status) && order.request?.status !== 'requested';
+                const canReturn = ['shipped', 'delivered'].includes(order.status) && order.request?.status !== 'requested';
+                return (
+                  <div key={order.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{order.itemTitle}</p>
+                        <p className="text-[11px] text-slate-500 mt-1">₹{order.amount.toLocaleString()} · {formatOrderStatusLabel(order.status)}</p>
+                        {order.invoiceNumber && <p className="text-[11px] text-slate-500 mt-1">Invoice: {order.invoiceNumber}</p>}
+                        {order.trackingId && <p className="text-[11px] text-sky-300 mt-1">Tracking: {order.trackingId}{order.carrier ? ` · ${order.carrier}` : ''}</p>}
+                        <p className="text-[11px] text-slate-400 mt-1">Estimated delivery: {formatEta(order.estimatedDelivery)}</p>
+                      </div>
+                      {order.status === 'paid-awaiting-address' ? <button onClick={() => { setAddressAuctionId(order.auctionId); setAddressForm(order.shippingAddress || DEFAULT_ORDER_ADDRESS); setShowAddressModal(true); }} className="px-3 py-2 rounded-xl bg-violet-600 text-white text-xs font-medium hover:bg-violet-500">Add address</button> : <span className="text-[10px] px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">{formatOrderStatusLabel(order.status)}</span>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => downloadInvoice(order.id, order.itemTitle)} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs hover:bg-white/10"><Download className="w-3.5 h-3.5" />Invoice</button>
+                      {order.courierLink && <a href={order.courierLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-300 text-xs hover:bg-sky-500/20"><Truck className="w-3.5 h-3.5" />Track shipment<ExternalLink className="w-3 h-3" /></a>}
+                    </div>
+                    {order.request && (
+                      <div className={clsx('rounded-xl border p-3', order.request.status === 'requested' ? 'border-amber-500/20 bg-amber-500/10' : order.request.status === 'approved' ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-red-500/20 bg-red-500/10')}>
+                        <p className="text-[11px] font-semibold text-white uppercase tracking-wide">{order.request.type} request · {order.request.status}</p>
+                        <p className="text-[11px] text-slate-300 mt-1">{order.request.reason}</p>
+                        {order.request.sellerNotes && <p className="text-[11px] text-slate-400 mt-1">Seller note: {order.request.sellerNotes}</p>}
+                      </div>
+                    )}
+                    {(canCancel || canReturn) && (
+                      <div className="rounded-xl bg-slate-950/60 border border-white/5 p-3 space-y-2">
+                        <textarea value={orderRequestDrafts[order.id] || ''} onChange={e => setOrderRequestDrafts(prev => ({ ...prev, [order.id]: e.target.value }))} placeholder={canCancel ? 'Why do you want to cancel this order?' : 'Why do you want to return this order?'} className="w-full min-h-[82px] bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none resize-none" />
+                        <div className="flex flex-wrap gap-2">
+                          {canCancel && <button onClick={() => submitOrderRequest(order.id, 'cancel')} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/20 text-amber-300 text-xs hover:bg-amber-500/25"><RotateCcw className="w-3.5 h-3.5" />Request cancellation</button>}
+                          {canReturn && <button onClick={() => submitOrderRequest(order.id, 'return')} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-fuchsia-500/15 border border-fuchsia-500/20 text-fuchsia-300 text-xs hover:bg-fuchsia-500/25"><Package className="w-3.5 h-3.5" />Request return</button>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {orders.filter(order => order.sellerId === myUser?.username).length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-xs font-semibold text-slate-400 mb-3">Seller Fulfillment</h3>
+            <div className="space-y-3">
+              {orders.filter(order => order.sellerId === myUser?.username).slice(0, 4).map(order => {
+                const draft = sellerFulfillmentDrafts[order.id] || createSellerFulfillmentDraft(order);
+                return (
+                  <div key={order.id} className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-white">{order.itemTitle}</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Buyer: {order.buyerId} · ₹{order.amount.toLocaleString()}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Status: {formatOrderStatusLabel(order.status)}</p>
+                        {order.invoiceNumber && <p className="text-[11px] text-slate-500 mt-1">Invoice: {order.invoiceNumber}</p>}
+                        <p className="text-[11px] text-slate-400 mt-1">Estimated delivery: {formatEta(order.estimatedDelivery)}</p>
+                      </div>
+                      <span className="text-[10px] px-2 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">{formatOrderStatusLabel(order.status)}</span>
+                    </div>
+                    {order.shippingAddress ? (
+                      <div className="rounded-xl bg-slate-950/60 border border-white/5 p-3">
+                        <p className="text-[11px] text-slate-300 font-medium">Ship to: {order.shippingAddress.fullName}</p>
+                        <p className="text-[11px] text-slate-500 mt-1">{order.shippingAddress.line1}{order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ''}, {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.postalCode}, {order.shippingAddress.country}</p>
+                        <p className="text-[11px] text-slate-500 mt-1">Phone: {order.shippingAddress.phone}</p>
+                      </div>
+                    ) : <p className="text-[11px] text-amber-300">Waiting for buyer shipping address.</p>}
+                    {order.request && (
+                      <div className={clsx('rounded-xl border p-3', order.request.status === 'requested' ? 'border-amber-500/20 bg-amber-500/10' : order.request.status === 'approved' ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-red-500/20 bg-red-500/10')}>
+                        <p className="text-[11px] font-semibold text-white uppercase tracking-wide">{order.request.type} request · {order.request.status}</p>
+                        <p className="text-[11px] text-slate-300 mt-1">{order.request.reason}</p>
+                        {order.request.sellerNotes && <p className="text-[11px] text-slate-400 mt-1">Seller note: {order.request.sellerNotes}</p>}
+                        {order.request.status === 'requested' && (
+                          <div className="mt-3 space-y-2">
+                            <textarea value={sellerRequestNotes[order.id] || ''} onChange={e => setSellerRequestNotes(prev => ({ ...prev, [order.id]: e.target.value }))} placeholder="Optional note for the buyer" className="w-full min-h-[72px] bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none resize-none" />
+                            <div className="flex flex-wrap gap-2">
+                              <button onClick={() => resolveOrderRequest(order.id, 'approve')} className="px-3 py-2 rounded-xl bg-emerald-600/20 border border-emerald-500/20 text-emerald-300 text-xs">Approve request</button>
+                              <button onClick={() => resolveOrderRequest(order.id, 'reject')} className="px-3 py-2 rounded-xl bg-red-600/20 border border-red-500/20 text-red-300 text-xs">Reject request</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input placeholder="Tracking ID" value={draft.trackingId} onChange={e => setSellerFulfillmentDrafts(prev => ({ ...prev, [order.id]: { ...draft, trackingId: e.target.value } }))} className="bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none" />
+                      <input placeholder="Carrier" value={draft.carrier} onChange={e => setSellerFulfillmentDrafts(prev => ({ ...prev, [order.id]: { ...draft, carrier: e.target.value } }))} className="bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none" />
+                      <input placeholder="Courier tracking link" value={draft.courierLink} onChange={e => setSellerFulfillmentDrafts(prev => ({ ...prev, [order.id]: { ...draft, courierLink: e.target.value } }))} className="bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none" />
+                      <input placeholder="Shipping label link" value={draft.shippingLabelUrl} onChange={e => setSellerFulfillmentDrafts(prev => ({ ...prev, [order.id]: { ...draft, shippingLabelUrl: e.target.value } }))} className="bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none" />
+                      <input type="datetime-local" value={draft.estimatedDelivery} onChange={e => setSellerFulfillmentDrafts(prev => ({ ...prev, [order.id]: { ...draft, estimatedDelivery: e.target.value } }))} className="bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none" />
+                      <input placeholder="Notes" value={draft.notes} onChange={e => setSellerFulfillmentDrafts(prev => ({ ...prev, [order.id]: { ...draft, notes: e.target.value } }))} className="bg-slate-950/60 border border-white/10 rounded-xl px-3 py-2 text-sm text-white outline-none sm:col-span-2" />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => updateOrderStatus(order.id)} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs hover:bg-white/10"><FileText className="w-3.5 h-3.5" />Save shipping details</button>
+                      <button onClick={() => downloadInvoice(order.id, order.itemTitle)} className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs hover:bg-white/10"><Download className="w-3.5 h-3.5" />Invoice</button>
+                      {(draft.shippingLabelUrl || order.shippingLabelUrl) && <a href={draft.shippingLabelUrl || order.shippingLabelUrl || '#'} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-500/15 border border-violet-500/20 text-violet-300 text-xs hover:bg-violet-500/25"><Package className="w-3.5 h-3.5" />Open label<ExternalLink className="w-3 h-3" /></a>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button onClick={() => updateOrderStatus(order.id, 'processing')} disabled={!order.shippingAddress} className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-xs disabled:opacity-40">Mark Processing</button>
+                      <button onClick={() => updateOrderStatus(order.id, 'shipped')} disabled={!order.shippingAddress} className="px-3 py-2 rounded-xl bg-sky-600/20 border border-sky-500/20 text-sky-300 text-xs disabled:opacity-40">Mark Shipped</button>
+                      <button onClick={() => updateOrderStatus(order.id, 'delivered')} disabled={!order.shippingAddress} className="px-3 py-2 rounded-xl bg-emerald-600/20 border border-emerald-500/20 text-emerald-300 text-xs disabled:opacity-40">Mark Delivered</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div className="mb-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold text-emerald-400 uppercase tracking-[0.18em]">Seller Analytics</h3>
+              <span className="text-[10px] text-slate-500">Dashboard</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-emerald-500/8 border border-emerald-500/20 rounded-xl p-4"><p className="text-[10px] text-slate-500 uppercase tracking-wider">Revenue</p><p className="text-xl font-bold text-emerald-400 mt-1">₹{(profileData.sellerAnalytics.totalRevenue || profileData.sellerAnalytics.potentialRevenue || 0).toLocaleString()}</p><p className="text-[11px] text-slate-500 mt-1">{profileData.sellerAnalytics.soldListings} sold</p></div>
+              <div className="bg-violet-500/8 border border-violet-500/20 rounded-xl p-4"><p className="text-[10px] text-slate-500 uppercase tracking-wider">Listings</p><p className="text-xl font-bold text-violet-400 mt-1">{profileData.sellerAnalytics.totalListings}</p><p className="text-[11px] text-slate-500 mt-1">{profileData.sellerAnalytics.activeListings} live · {profileData.sellerAnalytics.upcomingListings} upcoming</p></div>
+              <div className="bg-blue-500/8 border border-blue-500/20 rounded-xl p-4"><p className="text-[10px] text-slate-500 uppercase tracking-wider">Bid Demand</p><p className="text-xl font-bold text-blue-400 mt-1">{profileData.sellerAnalytics.totalBidsReceived}</p><p className="text-[11px] text-slate-500 mt-1">{profileData.sellerAnalytics.uniqueBidders} unique bidders</p></div>
+              <div className="bg-yellow-500/8 border border-yellow-500/20 rounded-xl p-4"><p className="text-[10px] text-slate-500 uppercase tracking-wider">Conversion</p><p className="text-xl font-bold text-yellow-400 mt-1">{profileData.sellerAnalytics.conversionRate}%</p><p className="text-[11px] text-slate-500 mt-1">Listings converted to sales</p></div>
+            </div>
+            {profileData.sellerAnalytics.totalListings > 0 ? (
+              <>
+            <div className="bg-white/[0.03] border border-white/8 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-white">Revenue trend</p>
+                <span className="text-[10px] text-slate-500">Last {Math.max(1, profileData.sellerAnalytics.revenueSeries?.length || 0)} listings</span>
+              </div>
+              <Sparkline data={profileData.sellerAnalytics.revenueSeries || []} />
+            </div>
+            {profileData.sellerAnalytics.topAuction && (
+              <div className="bg-white/[0.03] border border-white/8 rounded-2xl p-4">
+                <p className="text-xs font-semibold text-white mb-2">Top performing listing</p>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-white">{profileData.sellerAnalytics.topAuction.itemTitle}</p>
+                    <p className="text-[11px] text-slate-500 mt-1">{profileData.sellerAnalytics.topAuction.bidCount} bids · {profileData.sellerAnalytics.topAuction.status}</p>
+                  </div>
+                  <p className="text-sm font-bold text-emerald-400">₹{profileData.sellerAnalytics.topAuction.amount?.toLocaleString()}</p>
+                </div>
+              </div>
+            )}
+            <div>
+              <h3 className="text-xs font-semibold text-slate-400 mb-3">Recent Sales</h3>
+              <div className="space-y-2">
+                {profileData.sellerAnalytics.recentSales?.length ? profileData.sellerAnalytics.recentSales.map((sale: any, i: number) => (
+                  <div key={sale.auctionId || i} className="flex justify-between items-center p-3 rounded-xl bg-white/[0.03] border border-white/8">
+                    <div className="min-w-0 pr-3">
+                      <p className="text-sm font-medium text-white truncate">{sale.itemTitle}</p>
+                      <p className="text-[11px] text-slate-500 mt-1">Won by {sale.winner} · {new Date(sale.timestamp).toLocaleDateString()}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-semibold text-emerald-400">₹{sale.amount?.toLocaleString()}</p>
+                      <p className={clsx('text-[10px] mt-1', sale.paid ? 'text-emerald-400' : 'text-yellow-400')}>{sale.paid ? 'PAID' : 'PENDING'}</p>
+                    </div>
+                  </div>
+                )) : <p className="text-center text-slate-600 text-sm py-4">No completed sales yet</p>}
+              </div>
+            </div>
+              </>
+            ) : (
+              <div className="bg-white/[0.03] border border-dashed border-white/10 rounded-2xl p-6 text-center">
+                <p className="text-sm font-semibold text-white">No seller data yet</p>
+                <p className="text-xs text-slate-500 mt-2">Create your first auction to unlock seller analytics and sales insights.</p>
+                <button onClick={() => { setShowProfile(false); setShowCreateAuction(true); }} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 transition-all"><Tag className="w-4 h-4" />Create Listing</button>
+              </div>
+            )}
+          </div>
         <h3 className="text-xs font-semibold text-slate-400 mb-3">Recent Activity</h3>
         <div className="space-y-2">
           {profileData.bidHistory?.slice(0,10).map((b: any, i: number) => (
@@ -928,6 +1646,30 @@ function App() {
           ))}
           {(!profileData.bidHistory || profileData.bidHistory.length === 0) && <p className="text-center text-slate-600 text-sm py-4">No bids yet</p>}
         </div>
+      </div>
+    </div>
+  );
+  const AddressModal = () => !showAddressModal ? null : (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-6">
+      <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h2 className="text-xl font-bold text-white" style={{fontFamily:"'Space Grotesk',sans-serif"}}>Delivery Address</h2>
+            <p className="text-xs text-slate-500 mt-1">Add shipping details to start order fulfillment.</p>
+          </div>
+          <button onClick={() => setShowAddressModal(false)} className="p-2 hover:bg-slate-800 rounded-lg"><X className="w-5 h-5 text-slate-400" /></button>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            ['fullName', 'Full name'], ['phone', 'Phone'], ['line1', 'Address line 1'], ['line2', 'Address line 2'], ['city', 'City'], ['state', 'State'], ['postalCode', 'Postal code'], ['country', 'Country'],
+          ].map(([key, label]) => (
+            <div key={key} className={clsx('space-y-1.5', key === 'line1' ? 'sm:col-span-2' : key === 'line2' ? 'sm:col-span-2' : '')}>
+              <label className="text-xs font-medium text-slate-400">{label}</label>
+              <input value={(addressForm as any)[key] || ''} onChange={e => setAddressForm(prev => ({ ...prev, [key]: e.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-violet-500/60 outline-none" />
+            </div>
+          ))}
+        </div>
+        <button onClick={() => submitShippingAddress(addressAuctionId)} disabled={addressSaving} className="w-full mt-5 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white font-semibold py-3 rounded-xl transition-all">{addressSaving ? 'Saving address...' : 'Save address & start fulfillment'}</button>
       </div>
     </div>
   );
@@ -944,6 +1686,29 @@ function App() {
         </div>
 
         <form onSubmit={handleCreateAuction} className="p-7 space-y-6">
+          {(() => {
+            const minimumScheduleDate = formatDateLocal(Date.now() + 60_000);
+            const minimumScheduleTime = formatTimeLocal(Date.now() + 60_000);
+            const selectedScheduleDate = createForm.startAt ? createForm.startAt.slice(0, 10) : '';
+            const selectedScheduleTime = createForm.startAt ? createForm.startAt.slice(11, 16) : '';
+            const selectedTime12 = to12HourParts(selectedScheduleTime || minimumScheduleTime);
+            const minimumTime12 = to12HourParts(minimumScheduleTime);
+            const updateScheduleTime = (parts: Partial<{ hour: string; minute: string; period: 'AM' | 'PM' }>) => {
+              setCreateForm(p => {
+                const existingDate = p.startAt ? p.startAt.slice(0, 10) : minimumScheduleDate;
+                const existingTimeParts = to12HourParts(p.startAt ? p.startAt.slice(11, 16) : minimumScheduleTime);
+                const nextHour = parts.hour ?? existingTimeParts.hour;
+                const nextMinute = parts.minute ?? existingTimeParts.minute;
+                const nextPeriod: 'AM' | 'PM' = parts.period ?? existingTimeParts.period;
+                return {
+                  ...p,
+                  startAt: combineLocalDateTime(existingDate, to24HourTime(nextHour, nextMinute, nextPeriod)),
+                };
+              });
+            };
+
+            return (
+          <>
           {/* Product Info section */}
           <div>
             <p className="text-xs font-semibold text-emerald-400 mb-4 flex items-center gap-2"><Package className="w-3 h-3" />Product Info</p>
@@ -1101,14 +1866,59 @@ function App() {
               <button type="button" onClick={() => setCreateForm(p => ({ ...p, startMode: 'now', startAt: '' }))} className={clsx('py-2.5 rounded-xl text-sm font-medium border transition-all', createForm.startMode === 'now' ? 'bg-emerald-600 border-emerald-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}>
                 Go live now
               </button>
-              <button type="button" onClick={() => setCreateForm(p => ({ ...p, startMode: 'scheduled' }))} className={clsx('py-2.5 rounded-xl text-sm font-medium border transition-all', createForm.startMode === 'scheduled' ? 'bg-violet-600 border-violet-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}>
+              <button type="button" onClick={() => setCreateForm(p => ({ ...p, startMode: 'scheduled', startAt: p.startAt || formatDateTimeLocal(Date.now() + 10 * 60_000) }))} className={clsx('py-2.5 rounded-xl text-sm font-medium border transition-all', createForm.startMode === 'scheduled' ? 'bg-violet-600 border-violet-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}>
                 Schedule auction
               </button>
             </div>
             {createForm.startMode === 'scheduled' && (
-              <div className="space-y-1.5">
+              <div className="space-y-3">
                 <label className="text-xs font-medium text-slate-400">Start date & time</label>
-                <input type="datetime-local" value={createForm.startAt} min={formatDateTimeLocal(Date.now() + 60_000)} onChange={ev => setCreateForm(p => ({ ...p, startAt: ev.target.value }))} className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-violet-500/60 outline-none" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input
+                    type="date"
+                    value={selectedScheduleDate}
+                    min={minimumScheduleDate}
+                    onChange={ev => {
+                      const nextDate = ev.target.value;
+                      setCreateForm(p => ({
+                        ...p,
+                        startAt: nextDate
+                          ? combineLocalDateTime(nextDate, p.startAt ? p.startAt.slice(11, 16) : minimumScheduleTime)
+                          : '',
+                      }));
+                    }}
+                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm focus:border-violet-500/60 outline-none"
+                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    <select
+                      value={selectedTime12.hour}
+                      onChange={ev => updateScheduleTime({ hour: ev.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-sm focus:border-violet-500/60 outline-none cursor-pointer"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0')).map(hour => (
+                        <option key={hour} value={hour}>{hour}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedTime12.minute}
+                      onChange={ev => updateScheduleTime({ minute: ev.target.value })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-sm focus:border-violet-500/60 outline-none cursor-pointer"
+                    >
+                      {Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')).map(minute => (
+                        <option key={minute} value={minute}>{minute}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedTime12.period}
+                      onChange={ev => updateScheduleTime({ period: ev.target.value as 'AM' | 'PM' })}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 text-white text-sm focus:border-violet-500/60 outline-none cursor-pointer"
+                    >
+                      <option value="AM">AM</option>
+                      <option value="PM">PM</option>
+                    </select>
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500">Earliest start: {formatReadableLocalDateTime(Date.now() + 60_000)}{selectedScheduleDate === minimumScheduleDate ? ` · Minimum time today: ${minimumTime12.hour}:${minimumTime12.minute} ${minimumTime12.period}` : ''}</p>
                 <p className="text-xs text-slate-600">Your auction will stay in Upcoming mode until this time.</p>
               </div>
             )}
@@ -1123,6 +1933,9 @@ function App() {
           <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3.5 rounded-xl transition-all mt-2 shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 text-sm active:scale-[0.98]">
             <Tag className="w-4 h-4" />List Product — Go Live
           </button>
+          </>
+            );
+          })()}
         </form>
       </div>
     </div>
@@ -1137,7 +1950,7 @@ function App() {
           <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-fuchsia-700/6 rounded-full blur-[160px]" />
           <div className="absolute top-[40%] right-[20%] w-[35%] h-[35%] bg-indigo-700/5 rounded-full blur-[120px]" />
         </div>
-        <Toasts /><ProfileModal />{CreateAuctionModal()}
+        <Toasts /><ProfileModal /><AddressModal />{CreateAuctionModal()}
         <header className="border-b border-white/[0.06] bg-[#09090f]/95 backdrop-blur-xl sticky top-0 z-50">
           <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -1159,8 +1972,14 @@ function App() {
                 {showNotifications && (
                   <div className="absolute right-0 top-11 w-80 bg-[#12101f] border border-white/10 rounded-xl shadow-2xl z-[200] overflow-hidden">
                     <div className="px-4 py-3 border-b border-white/8 flex justify-between items-center">
-                      <p className="text-sm font-semibold text-white">Notifications</p>
-                      <button onClick={() => setNotifications(prev => prev.map(n => ({...n, read: true})))} className="text-xs text-violet-400 hover:text-violet-300 font-medium">Mark all read</button>
+                      <div>
+                        <p className="text-sm font-semibold text-white">Notifications</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5">{browserAlertsEnabled ? 'Browser alerts enabled' : 'Enable browser alerts for desktop popups'}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {!browserAlertsEnabled && <button onClick={requestBrowserAlerts} className="text-[10px] px-2 py-1 rounded-lg bg-violet-500/15 border border-violet-500/20 text-violet-300 hover:bg-violet-500/25">Enable alerts</button>}
+                        <button onClick={() => setNotifications(prev => prev.map(n => ({...n, read: true})))} className="text-xs text-violet-400 hover:text-violet-300 font-medium">Mark all read</button>
+                      </div>
                     </div>
                     <div className="max-h-72 overflow-y-auto">
                       {notifications.length === 0 ? (
@@ -1224,7 +2043,83 @@ function App() {
                 </button>
               ))}
             </div>
+            <button onClick={saveCurrentSearch} className="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-500/25 bg-violet-500/10 px-3 py-2.5 text-sm font-medium text-violet-300 hover:bg-violet-500/20 flex-shrink-0">
+              <Star className="w-4 h-4" /> Save search
+            </button>
           </div>
+
+          {(savedSearches.length > 0 || recommendations.length > 0) && (
+            <div className="mb-6 space-y-4">
+              <div className="grid grid-cols-1 xl:grid-cols-[1.15fr,1.85fr] gap-4">
+                <div className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-4">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-300">Saved searches</p>
+                      <p className="text-[11px] text-slate-500 mt-1">Reuse filters in one click.</p>
+                    </div>
+                    <span className="text-[11px] text-slate-500">{savedSearches.length}/12</span>
+                  </div>
+                  {savedSearches.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {savedSearches.slice(0, 8).map(search => (
+                        <div key={search.id} className="group flex items-center gap-1 rounded-xl border border-white/10 bg-slate-950/60 px-3 py-2">
+                          <button onClick={() => applySavedSearch(search)} className="text-left">
+                            <p className="text-xs font-medium text-white">{search.label}</p>
+                            <p className="text-[10px] text-slate-500 mt-0.5">{[search.query || 'Any keyword', search.category && search.category !== 'All' ? search.category : '', search.filter && search.filter !== 'all' ? search.filter.replace(/_/g, ' ') : ''].filter(Boolean).join(' · ')}</p>
+                          </button>
+                          <div className="flex items-center gap-1 ml-1">
+                            {search.notificationsEnabled && <Bell className="w-3 h-3 text-amber-300" />}
+                            <button onClick={() => deleteSavedSearch(search.id)} className="rounded-lg p-1 text-slate-500 hover:bg-red-500/10 hover:text-red-300"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-5 text-center">
+                      <p className="text-sm font-medium text-white">No saved searches yet</p>
+                      <p className="text-[11px] text-slate-500 mt-1">Set a keyword or category and save it for instant reuse.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-white/[0.08] bg-gradient-to-br from-blue-500/10 via-violet-500/10 to-transparent p-4">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-300">Smart recommendations</p>
+                      <p className="text-[11px] text-slate-500 mt-1">Based on bids, purchases, and saved searches.</p>
+                    </div>
+                    <button onClick={() => void loadRecommendations()} className="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-medium text-slate-300 hover:bg-white/10"><RefreshCw className="w-3.5 h-3.5" />Refresh</button>
+                  </div>
+                  {recommendations.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                      {recommendations.slice(0, 3).map(auction => (
+                        <button key={auction.id} onClick={() => joinAuction(auction.id)} className="text-left rounded-2xl border border-white/10 bg-slate-950/50 p-3 hover:bg-slate-900/70 transition-all">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-white truncate">{auction.itemTitle}</p>
+                              <p className="text-[11px] text-slate-500 mt-1">{auction.category} · {auction.status}</p>
+                            </div>
+                            <span className="rounded-full bg-sky-500/15 px-2 py-1 text-[10px] font-semibold text-sky-300">{auction.recommendationScore} pts</span>
+                          </div>
+                          <p className="text-[11px] text-sky-300 mt-3">{auction.recommendationReason}</p>
+                          {auction.recommendationReasons && auction.recommendationReasons.length > 1 && <p className="text-[10px] text-slate-500 mt-1">{auction.recommendationReasons.slice(1).join(' · ')}</p>}
+                          <div className="mt-4 flex items-center justify-between text-[11px]">
+                            <span className="font-semibold text-white">₹{auction.currentBid.toLocaleString()}</span>
+                            <span className="text-slate-400">{auction.bidCount} bids</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-white/10 bg-slate-950/30 px-4 py-6 text-center">
+                      <p className="text-sm font-medium text-white">Recommendations will appear here</p>
+                      <p className="text-[11px] text-slate-500 mt-1">Bid on items or save searches to train your discovery feed.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Sell Your Product Hero Banner */}
           <div className="mb-6 rounded-2xl overflow-hidden" style={{background:'linear-gradient(135deg, rgba(6,45,30,0.8) 0%, rgba(5,30,25,0.7) 100%)', border:'1px solid rgba(16,185,129,0.15)'}}>
@@ -1282,7 +2177,7 @@ function App() {
             });
             // Featured auction: hottest active auction (most bids)
             const featuredAuction = !searchQuery && categoryFilter === 'All' && lobbyFilter === 'all' && lobbyTab === 'all'
-              ? filteredAuctions.find(a => a.status === 'Active' && a.bidCount >= 1) || filteredAuctions.find(a => a.status === 'Active') || null
+              ? filteredAuctions.find(a => a.status === 'Active' && a.moderationStatus === 'Approved' && a.bidCount >= 1) || filteredAuctions.find(a => a.status === 'Active' && a.moderationStatus === 'Approved') || null
               : null;
             const gridAuctions = featuredAuction ? filteredAuctions.filter(a => a.id !== featuredAuction.id) : filteredAuctions;
             return filteredAuctions.length > 0 ? (
@@ -1296,6 +2191,10 @@ function App() {
                 const faMins = Math.max(0, Math.floor(faEndsIn / 60000));
                 const faSecs = Math.max(0, Math.floor((faEndsIn % 60000) / 1000));
                 const faEndingSoon = fa.status === 'Active' && faEndsIn > 0 && faEndsIn < 60000;
+                const moderationMeta = moderationPill(fa.moderationStatus);
+                const sellerTrustMeta = trustPill(fa.sellerTrustLabel, fa.sellerVerified);
+                const ModerationIcon = moderationMeta.icon;
+                const TrustIcon = sellerTrustMeta.icon;
                 return (
                   <div className="rounded-3xl overflow-hidden border border-white/[0.07] bg-[#0f0f1a] shadow-2xl shadow-black/40">
                     {/* Hero image */}
@@ -1312,6 +2211,7 @@ function App() {
                           <span className={clsx('w-1.5 h-1.5 rounded-full', fa.status === 'Upcoming' ? 'bg-white' : 'bg-white animate-pulse')} />{fa.status === 'Upcoming' ? 'UPCOMING AUCTION' : 'LIVE AUCTION'}
                         </span>
                         {fa.status === 'Active' && fa.bidCount >= 3 && <span className="bg-orange-500/90 backdrop-blur-sm text-white text-[10px] font-semibold px-3 py-1.5 rounded-full">🔥 HOT</span>}
+                        <span className={clsx('flex items-center gap-1.5 text-[10px] font-semibold px-3 py-1.5 rounded-full backdrop-blur-sm', moderationMeta.className)}><ModerationIcon className="w-3 h-3" />{moderationMeta.label}</span>
                       </div>
                       {/* Watchlist */}
                       <button onClick={e => { e.stopPropagation(); toggleWatchlist(fa.id); }} className="absolute top-4 right-4 w-9 h-9 bg-black/40 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-black/60 transition-all">
@@ -1320,7 +2220,10 @@ function App() {
                     </div>
                     {/* Details */}
                     <div className="p-6">
-                      <p className="text-xs text-slate-500 mb-1">{fa.category}{fa.createdBy ? ` · by ${fa.createdBy}` : ''}</p>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <p className="text-xs text-slate-500">{fa.category}{fa.createdBy ? ` · by ${fa.createdBy}` : ''}</p>
+                        <span className={clsx('inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full', sellerTrustMeta.className)}><TrustIcon className="w-3 h-3" />{sellerTrustMeta.label}</span>
+                      </div>
                       <h3 className="text-2xl font-bold text-white leading-tight mb-5" style={{fontFamily:"'Space Grotesk',sans-serif"}}>{fa.itemTitle}</h3>
                       {fa.description && <p className="text-sm text-slate-400 leading-relaxed mb-5 line-clamp-2">{fa.description}</p>}
                       <div className="flex items-end gap-8 mb-5">
@@ -1357,8 +2260,8 @@ function App() {
                           <p className="text-sm font-medium text-yellow-400">You're currently winning this auction!</p>
                         </div>
                       )}
-                      <button onClick={() => joinAuction(fa.id)} className="w-full bg-violet-600 hover:bg-violet-500 text-white font-semibold py-3.5 rounded-xl text-sm transition-all active:scale-[0.98] shadow-lg shadow-violet-500/20 flex items-center justify-center gap-2">
-                        <Zap className="w-4 h-4" /> {fa.status === 'Upcoming' ? 'Preview Auction' : 'Place a Bid'}
+                      <button onClick={() => joinAuction(fa.id)} className={clsx('w-full text-white font-semibold py-3.5 rounded-xl text-sm transition-all active:scale-[0.98] shadow-lg flex items-center justify-center gap-2', fa.moderationStatus === 'Approved' ? 'bg-violet-600 hover:bg-violet-500 shadow-violet-500/20' : 'bg-slate-700 hover:bg-slate-600 shadow-black/20')}>
+                        <Zap className="w-4 h-4" /> {fa.moderationStatus === 'Approved' ? (fa.status === 'Upcoming' ? 'Preview Auction' : 'Place a Bid') : 'View Trust Details'}
                       </button>
                     </div>
                   </div>
@@ -1387,6 +2290,10 @@ function App() {
                   const tSecs = Math.max(0, Math.floor((timeLeft % 60000) / 1000));
                   const priceRise = auction.startingPrice > 0 ? Math.round(((auction.currentBid - auction.startingPrice) / auction.startingPrice) * 100) : 0;
                   const isWinning = auction.highestBidderId === myUser?.username && auction.status === 'Active';
+                  const moderationMeta = moderationPill(auction.moderationStatus);
+                  const sellerTrustMeta = trustPill(auction.sellerTrustLabel, auction.sellerVerified);
+                  const ModerationIcon = moderationMeta.icon;
+                  const TrustIcon = sellerTrustMeta.icon;
                   return (
                     <div key={auction.id} className={clsx(
                       'bg-[#0f0f1a] border rounded-2xl overflow-hidden transition-all duration-300 group cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/50',
@@ -1417,6 +2324,7 @@ function App() {
                             <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-slate-800/80 text-slate-400 backdrop-blur-md">ENDED</span>
                           ) : null}
                           {isNew && <span className="text-[10px] font-semibold px-2.5 py-1 rounded-full bg-violet-500/90 text-white backdrop-blur-md">NEW</span>}
+                          <span className={clsx('flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full backdrop-blur-md', moderationMeta.className)}><ModerationIcon className="w-3 h-3" />{auction.moderationStatus === 'Approved' ? 'TRUSTED' : auction.moderationStatus?.toUpperCase()}</span>
                         </div>
                         {/* Top-right: heart */}
                         <button onClick={e => { e.stopPropagation(); toggleWatchlist(auction.id); }} className="absolute top-3 right-3 w-8 h-8 bg-black/50 backdrop-blur-md rounded-full flex items-center justify-center hover:bg-black/70 transition-all group/heart">
@@ -1445,6 +2353,7 @@ function App() {
                               <span className="text-[11px] text-slate-500 truncate max-w-[100px]">{auction.createdBy}</span>
                             </div>
                           )}
+                          <span className={clsx('text-[10px] px-2 py-0.5 rounded-full inline-flex items-center gap-1', sellerTrustMeta.className)}><TrustIcon className="w-3 h-3" />{sellerTrustMeta.label}</span>
                           <span className="ml-auto text-[10px] font-medium px-2 py-0.5 rounded-full" style={{background: catColor + '15', color: catColor}}>{auction.category}</span>
                         </div>
 
@@ -1482,11 +2391,12 @@ function App() {
                             className={clsx('flex-shrink-0 font-semibold px-4 py-2 rounded-lg text-xs transition-all active:scale-95',
                               auction.status === 'Active' || auction.status === 'Upcoming' ? 'text-white hover:brightness-110 shadow-md' : 'bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300'
                             )}
-                            style={auction.status === 'Active' || auction.status === 'Upcoming' ? {background: catColor, boxShadow: `0 4px 12px ${catColor}30`} : undefined}
+                            style={auction.status === 'Active' || auction.status === 'Upcoming' ? {background: auction.moderationStatus === 'Approved' ? catColor : '#475569', boxShadow: auction.moderationStatus === 'Approved' ? `0 4px 12px ${catColor}30` : undefined} : undefined}
                           >
-                            {auction.status === 'Upcoming' ? 'Preview' : auction.status === 'Active' ? 'Bid Now' : 'Results'}
+                            {auction.moderationStatus === 'Approved' ? (auction.status === 'Upcoming' ? 'Preview' : auction.status === 'Active' ? 'Bid Now' : 'Results') : 'View'}
                           </button>
                         </div>
+                        {auction.moderationStatus !== 'Approved' && auction.moderationNotes && <p className="mt-2 text-[10px] text-amber-300/80">{auction.moderationNotes}</p>}
 
                         {/* Ended: show winner */}
                         {auction.status !== 'Active' && auction.highestBidderId && auction.highestBidderId !== 'None' && (
@@ -1525,6 +2435,7 @@ function App() {
       </div>
       <Toasts />
       <ProfileModal />
+      <AddressModal />
       {CreateAuctionModal()}
 
       {/* Winner Overlay */}
@@ -1538,9 +2449,16 @@ function App() {
             <p className="text-5xl font-bold tabular-nums mt-3" style={{fontFamily:"'Space Grotesk',sans-serif"}}>₹{winnerOverlay.amount?.toLocaleString()}</p>
             {winnerOverlay.winner === myUser?.username && (
               paidAuctions.has(winnerOverlay.auctionId) ? (
-                <div className="mt-5 bg-green-600/90 rounded-2xl py-3 px-5 flex items-center justify-center gap-2">
-                  <Check className="w-5 h-5" />
-                  <span className="text-sm font-semibold">Payment Complete!</span>
+                <div className="mt-5 space-y-3">
+                  <div className="bg-green-600/90 rounded-2xl py-3 px-5 flex items-center justify-center gap-2">
+                    <Check className="w-5 h-5" />
+                    <span className="text-sm font-semibold">Payment Complete!</span>
+                  </div>
+                  {orders.find(order => order.auctionId === winnerOverlay.auctionId)?.status === 'paid-awaiting-address' && (
+                    <button onClick={() => { const order = orders.find(current => current.auctionId === winnerOverlay.auctionId); setAddressAuctionId(winnerOverlay.auctionId); setAddressForm(order?.shippingAddress || DEFAULT_ORDER_ADDRESS); setShowAddressModal(true); }} className="w-full bg-slate-950 hover:bg-slate-900 text-white font-semibold py-3 rounded-xl text-sm">
+                      Add delivery address
+                    </button>
+                  )}
                 </div>
               ) : (
                 <div className="mt-5 space-y-3">
@@ -1626,8 +2544,14 @@ function App() {
                {showNotifications && (
                  <div className="absolute right-0 top-12 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-[200] overflow-hidden">
                    <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-                     <p className="text-xs font-semibold text-white uppercase tracking-wide">Notifications</p>
-                     <button onClick={() => setNotifications(prev => prev.map(n => ({...n, read: true})))} className="text-[10px] text-violet-400 font-bold hover:text-violet-300">Mark all read</button>
+                     <div>
+                       <p className="text-xs font-semibold text-white uppercase tracking-wide">Notifications</p>
+                       <p className="text-[10px] text-violet-300/50 mt-0.5">{browserAlertsEnabled ? 'Browser alerts enabled' : 'Enable browser alerts for desktop popups'}</p>
+                     </div>
+                     <div className="flex items-center gap-2">
+                       {!browserAlertsEnabled && <button onClick={requestBrowserAlerts} className="text-[10px] px-2 py-1 rounded-lg bg-violet-500/15 border border-violet-500/20 text-violet-300 font-bold hover:bg-violet-500/25">Enable alerts</button>}
+                       <button onClick={() => setNotifications(prev => prev.map(n => ({...n, read: true})))} className="text-[10px] text-violet-400 font-bold hover:text-violet-300">Mark all read</button>
+                     </div>
                    </div>
                    <div className="max-h-72 overflow-y-auto custom-scrollbar">
                      {notifications.length === 0 ? (
@@ -1761,6 +2685,30 @@ function App() {
                    </div>
                  )}
 
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                   <div className={clsx('rounded-xl px-3 py-2.5 flex items-start gap-2', roomModerationMeta.className)}>
+                     <RoomModerationIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                     <div>
+                       <p className="text-xs font-semibold">{roomModerationMeta.label}</p>
+                       {auctionState.moderationNotes && <p className="text-[10px] opacity-80 mt-1">{auctionState.moderationNotes}</p>}
+                     </div>
+                   </div>
+                   <div className={clsx('rounded-xl px-3 py-2.5 flex items-start gap-2', roomTrustMeta.className)}>
+                     <RoomTrustIcon className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                     <div>
+                       <p className="text-xs font-semibold">{auctionState.sellerTrustLabel}</p>
+                       <p className="text-[10px] opacity-80 mt-1">Trust score {auctionState.sellerTrustScore || 0}/100</p>
+                     </div>
+                   </div>
+                 </div>
+
+                 {moderationLocked && (
+                   <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+                     <p className="text-sm font-semibold text-amber-300">Bidding is locked while this listing is under trust review.</p>
+                     <p className="text-[11px] text-amber-200/70 mt-1">You can still inspect the auction details, but bid and Buy Now stay disabled until the seller updates the listing.</p>
+                   </div>
+                 )}
+
                  <div className={clsx("bg-slate-950 rounded-2xl p-4 border flex flex-col gap-2 transition-all duration-300", isUrgent ? "border-red-500/80 shadow-[0_0_20px_rgba(239,68,68,0.3)]" : "border-slate-800/50")}>
                     <div className="flex justify-between items-center">
                        <p className={clsx("text-xs font-medium flex items-center gap-1.5", isUrgent ? "text-red-400" : "text-slate-400")}>
@@ -1782,7 +2730,7 @@ function App() {
 
                  {/* Buy Now */}
                  {auctionState.buyNowPrice != null && auctionState.status === 'Active' && (
-                   <button onClick={handleBuyNow} className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/20">
+                   <button onClick={handleBuyNow} disabled={moderationLocked} className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900/40 disabled:text-slate-400 text-white font-semibold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/20 disabled:shadow-none">
                      <ShoppingCart className="w-4 h-4" /> Buy Now ₹{auctionState.buyNowPrice.toLocaleString()}
                    </button>
                  )}
@@ -1798,7 +2746,7 @@ function App() {
                  {/* Bid increment presets */}
                  <div className="grid grid-cols-4 gap-2">
                    {[100, 500, 1000, 5000].map(inc => (
-                     <button key={inc} onClick={() => { const next = (auctionState.currentBid || auctionState.startingPrice) + inc; socket.emit('place_bid', { auctionId: auctionState.auctionId, amount: next }); }} disabled={auctionState.status !== 'Active'} className="bg-white/5 hover:bg-violet-600 border border-white/10 hover:border-violet-500 text-white font-medium py-2 rounded-lg text-sm transition-all disabled:opacity-30 active:scale-95">
+                     <button key={inc} onClick={() => { const next = (auctionState.currentBid || auctionState.startingPrice) + inc; socket.emit('place_bid', { auctionId: auctionState.auctionId, amount: next }); }} disabled={auctionState.status !== 'Active' || moderationLocked} className="bg-white/5 hover:bg-violet-600 border border-white/10 hover:border-violet-500 text-white font-medium py-2 rounded-lg text-sm transition-all disabled:opacity-30 active:scale-95">
                        +{inc >= 1000 ? `${inc/1000}k` : inc}
                      </button>
                    ))}
@@ -1806,7 +2754,7 @@ function App() {
                  <p className="text-[10px] text-slate-600 text-center">Quick increment · Min bid: ₹100</p>
 
                  {/* Auto-Bid Panel */}
-                 {auctionState.status === 'Active' && (
+                 {auctionState.status === 'Active' && !moderationLocked && (
                    <div className="bg-slate-950 rounded-2xl p-4 border border-yellow-500/20">
                      <div className="flex items-center justify-between mb-3">
             <p className="text-[10px] font-semibold text-yellow-400/80 flex items-center gap-1.5"><Zap className="w-3 h-3 text-yellow-400" /> Auto-Bid</p>
@@ -1853,9 +2801,22 @@ function App() {
                  {/* Pay Now — shown to winner when auction is closed */}
                  {auctionState.status === 'Closed' && auctionState.highestBidderId === myUser?.username && (
                    paidAuctions.has(auctionState.auctionId) ? (
-                     <div className="flex items-center justify-center gap-2 bg-green-600/15 border border-green-600/30 rounded-2xl py-3 px-4">
-                       <Check className="w-4 h-4 text-green-400" />
-                       <span className="text-xs font-medium text-green-400">Payment Complete</span>
+                     <div className="space-y-3">
+                       <div className="flex items-center justify-center gap-2 bg-green-600/15 border border-green-600/30 rounded-2xl py-3 px-4">
+                         <Check className="w-4 h-4 text-green-400" />
+                         <span className="text-xs font-medium text-green-400">Payment Complete</span>
+                       </div>
+                       {currentOrder?.status === 'paid-awaiting-address' && (
+                         <button onClick={() => { setAddressAuctionId(auctionState.auctionId); setAddressForm(currentOrder.shippingAddress || DEFAULT_ORDER_ADDRESS); setShowAddressModal(true); }} className="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold py-3 rounded-xl text-sm transition-all">
+                           Add delivery address
+                         </button>
+                       )}
+                       {currentOrder && currentOrder.status !== 'paid-awaiting-address' && (
+                         <div className="space-y-1 text-center text-[11px] text-slate-400">
+                           <div>Order status: {formatOrderStatusLabel(currentOrder.status)}{currentOrder.trackingId ? ` · Tracking ${currentOrder.trackingId}` : ''}</div>
+                           <div>Estimated delivery: {formatEta(currentOrder.estimatedDelivery)}</div>
+                         </div>
+                       )}
                      </div>
                    ) : (
                      <button
@@ -1974,13 +2935,14 @@ function App() {
                          value={bidAmount} 
                          onChange={(e)=>setBidAmount(e.target.value)} 
                          onFocus={() => { if (!bidAmount) setBidAmount(String(auctionState.currentBid + 100)); }}
+                         disabled={moderationLocked}
                          placeholder={`Min ₹${(auctionState.currentBid + 100).toLocaleString()}`}
-                         className="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-10 text-2xl font-bold text-white focus:outline-none focus:border-violet-500/60 focus:ring-2 focus:ring-violet-500/10 transition-all placeholder:text-slate-700 tabular-nums" 
+                         className="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-10 text-2xl font-bold text-white focus:outline-none focus:border-violet-500/60 focus:ring-2 focus:ring-violet-500/10 transition-all placeholder:text-slate-700 tabular-nums disabled:opacity-40" 
                        />
                     </div>
                     <button 
                       type="submit"
-                      disabled={auctionState.status !== 'Active'}
+                      disabled={auctionState.status !== 'Active' || moderationLocked}
                       className="px-8 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl shadow-lg shadow-violet-500/20 hover:scale-[1.02] active:scale-95 transition-all text-lg disabled:opacity-30"
                     >
                        Bid

@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+
+# compiled output files in src (old build artifacts)
+src/**/*.js
+src/**/*.js.map
+src/**/*.d.ts
+src/**/*.d.ts.map
+
+# local database file - should not be committed
+db.json
