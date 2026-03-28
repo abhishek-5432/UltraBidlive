@@ -6,6 +6,7 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import { OAuth2Client } from 'google-auth-library';
 import { getDB } from './db.js';
+import type { DB } from './db.js';
 import { generateToken, verifyToken } from './auth.js';
 import { sendAlertEmail } from './email.js';
 import { v4 as uuidv4 } from 'uuid';
