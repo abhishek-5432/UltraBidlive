@@ -971,7 +971,20 @@ function App() {
         (window as any).google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: (resp: any) => handleGoogleLogin(resp.credential),
+          ux_mode: 'popup',
+          use_fedcm_for_prompt: false,
         });
+        // Render button into container if available
+        const btnContainer = document.getElementById('google-signin-btn');
+        if (btnContainer) {
+          (window as any).google.accounts.id.renderButton(btnContainer, {
+            theme: 'filled_black',
+            size: 'large',
+            shape: 'pill',
+            width: btnContainer.offsetWidth,
+            text: 'continue_with',
+          });
+        }
       }
     };
     // If GSI script already loaded
@@ -1426,8 +1439,13 @@ function App() {
                        <div className="flex-1 h-px bg-white/8" />
                     </div>
 
-                    <button type="button" onClick={() => (window as any).google?.accounts.id.prompt()}
-                       className="w-full flex items-center justify-center gap-3 bg-white/5 border border-white/10 text-slate-300 text-sm font-medium py-3 rounded-xl hover:bg-white/8 hover:border-white/15 transition-all">
+                    {/* Google's official rendered button */}
+                    <div id="google-signin-btn" className="w-full flex items-center justify-center" />
+                    {/* Fallback custom button if GSI renderButton didn't work */}
+                    <button type="button" onClick={() => { (window as any).google?.accounts?.id?.prompt(); }}
+                       id="google-signin-fallback"
+                       className="w-full flex items-center justify-center gap-3 bg-white/5 border border-white/10 text-slate-300 text-sm font-medium py-3 rounded-xl hover:bg-white/8 hover:border-white/15 transition-all"
+                       style={{ display: 'none' }}>
                        <svg viewBox="0 0 24 24" className="w-4 h-4" xmlns="http://www.w3.org/2000/svg">
                           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                           <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
