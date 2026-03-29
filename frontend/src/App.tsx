@@ -534,6 +534,14 @@ function App() {
   };
 
   const handleRazorpayPayment = async (auctionId: string) => {
+    if (!(window as any).Razorpay) {
+      addToast('error', 'Razorpay checkout script not loaded. Please refresh the page and try again.');
+      return;
+    }
+    if (!isAuthenticated || !myUser) {
+      addToast('error', 'Please sign in before making a payment.');
+      return;
+    }
     setPaymentProcessing(true);
     try {
       const token = localStorage.getItem('token');
@@ -543,7 +551,7 @@ function App() {
         body: JSON.stringify({ auctionId }),
       });
       const data = await res.json();
-      if (!res.ok) { addToast('error', data.error || 'Payment failed'); setPaymentProcessing(false); return; }
+      if (!res.ok) { addToast('error', data.error || 'Payment initiation failed'); setPaymentProcessing(false); return; }
 
       const options = {
         key: data.key,
@@ -566,7 +574,7 @@ function App() {
               addToast('win', `✅ Payment successful! ID: ${response.razorpay_payment_id}`);
               pushNotification('win', `💳 Payment confirmed for auction — ₹${(data.amount/100).toLocaleString()}`);
             } else { addToast('error', vData.error || 'Payment verification failed'); }
-          } catch { addToast('error', 'Payment verification error'); }
+          } catch { addToast('error', 'Payment verification error. Please contact support.'); }
           setPaymentProcessing(false);
         },
         prefill: { name: myUser?.username || '', email: myUser?.email || '' },
@@ -575,12 +583,12 @@ function App() {
       };
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', (resp: any) => {
-        addToast('error', `Payment failed: ${resp.error.description}`);
+        addToast('error', `Payment failed: ${resp.error?.description || 'Unknown error'}`);
         setPaymentProcessing(false);
       });
       rzp.open();
     } catch (err) {
-      addToast('error', 'Could not initiate payment');
+      addToast('error', getFetchErrorMessage(err));
       setPaymentProcessing(false);
     }
   };
@@ -966,34 +974,63 @@ function App() {
   }, []);
 
   useEffect(() => {
+    // Only init GSI when the login form is visible
+    if (isAuthenticated) return;
+
     const initGoogle = () => {
-      if ((window as any).google?.accounts?.id) {
-        (window as any).google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: (resp: any) => handleGoogleLogin(resp.credential),
-          ux_mode: 'popup',
-          use_fedcm_for_prompt: false,
-        });
-        // Render button into container if available
+      const gsi = (window as any).google?.accounts?.id;
+      if (!gsi) return;
+
+      gsi.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: (resp: any) => handleGoogleLogin(resp.credential),
+        ux_mode: 'popup',
+        use_fedcm_for_prompt: false,
+        itp_support: true,
+      });
+
+      // Use rAF to ensure the DOM element is painted before renderButton
+      requestAnimationFrame(() => {
         const btnContainer = document.getElementById('google-signin-btn');
+        const fallbackBtn = document.getElementById('google-signin-fallback');
         if (btnContainer) {
-          (window as any).google.accounts.id.renderButton(btnContainer, {
-            theme: 'filled_black',
-            size: 'large',
-            shape: 'pill',
-            width: btnContainer.offsetWidth,
-            text: 'continue_with',
-          });
+          btnContainer.innerHTML = ''; // clear previous render
+          try {
+            gsi.renderButton(btnContainer, {
+              theme: 'filled_black',
+              size: 'large',
+              shape: 'pill',
+              width: btnContainer.offsetWidth || 300,
+              text: 'continue_with',
+            });
+            if (fallbackBtn) fallbackBtn.style.display = 'none';
+          } catch {
+            // renderButton failed — show fallback
+            if (fallbackBtn) fallbackBtn.style.display = '';
+          }
+        } else if (fallbackBtn) {
+          fallbackBtn.style.display = '';
         }
-      }
+      });
     };
+
     // If GSI script already loaded
     if ((window as any).google?.accounts?.id) initGoogle();
-    else window.addEventListener('load', initGoogle, { once: true });
-    return () => window.removeEventListener('load', initGoogle);
-  }, [handleGoogleLogin]);
+    else {
+      // Wait for script to load
+      const onLoad = () => initGoogle();
+      window.addEventListener('load', onLoad, { once: true });
+      // Also poll briefly in case 'load' already fired
+      const timer = setInterval(() => {
+        if ((window as any).google?.accounts?.id) { clearInterval(timer); initGoogle(); }
+      }, 200);
+      return () => { window.removeEventListener('load', onLoad); clearInterval(timer); };
+    }
+  }, [handleGoogleLogin, isAuthenticated]);
 
   const handleLogout = () => {
+    // Tell GSI to stop auto-select on next page load
+    try { (window as any).google?.accounts?.id?.disableAutoSelect(); } catch { /* ignore */ }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;

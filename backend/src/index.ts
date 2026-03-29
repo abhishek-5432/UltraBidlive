@@ -393,7 +393,10 @@ app.post('/api/auth/google', async (req, res) => {
     }
     const token = generateToken(user.id, user.username);
     res.json({ token, user: { id: user.id, username: user.username, email: user.email } });
-  } catch { res.status(401).json({ error: 'Google authentication failed' }); }
+  } catch (err: any) {
+    console.error('Google OAuth error:', err?.message || err);
+    res.status(401).json({ error: 'Google authentication failed. Please ensure your Google account is valid and try again.' });
+  }
 });
 
 app.post('/api/login', async (req, res) => {
