@@ -652,6 +652,72 @@ app.post('/api/payment/verify', authMiddleware, async (req: any, res: any) => {
   }
 });
 
+// ── Payment: client-side confirm (no order creation needed) ───────
+app.post('/api/payment/client-confirm', authMiddleware, async (req: any, res: any) => {
+  const { auctionId, razorpay_payment_id, amount } = req.body;
+  try {
+    if (!auctionId || !razorpay_payment_id) return res.status(400).json({ error: 'Missing payment details' });
+    const auction = db.data.auctions.find(a => a.id === auctionId);
+    if (!auction || auction.status !== 'Closed') return res.status(400).json({ error: 'Auction not closed yet' });
+    if (auction.highestBidderId !== req.user.username) return res.status(403).json({ error: 'You are not the winner' });
+    const alreadyPaid = db.data.payments.find(p => p.auctionId === auctionId && p.status === 'paid');
+    if (alreadyPaid) return res.status(400).json({ error: 'Already paid' });
+
+    const payment = {
+      id: uuidv4(),
+      auctionId,
+      userId: req.user.username,
+      razorpayOrderId: '',
+      razorpayPaymentId: razorpay_payment_id,
+      amount: amount || auction.currentBid,
+      status: 'paid' as const,
+      timestamp: Date.now(),
+    };
+    db.data.payments.push(payment);
+
+    const existingOrder = db.data.orders.find(o => o.auctionId === auctionId);
+    const order = existingOrder || {
+      id: uuidv4(),
+      auctionId,
+      paymentId: payment.id,
+      buyerId: req.user.username,
+      sellerId: auction.createdBy || 'system',
+      itemTitle: auction.itemTitle || 'Auction Item',
+      amount: payment.amount,
+      status: 'paid-awaiting-address' as const,
+      invoiceNumber: createInvoiceNumber(uuidv4()),
+      estimatedDelivery: estimateDelivery(7),
+      shippingAddress: null,
+      trackingId: null,
+      carrier: null,
+      courierLink: null,
+      shippingLabelUrl: null,
+      notes: null,
+      request: null,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    if (!existingOrder) db.data.orders.push(order);
+    else {
+      existingOrder.paymentId = payment.id;
+      existingOrder.amount = payment.amount;
+      existingOrder.status = existingOrder.shippingAddress ? 'processing' : 'paid-awaiting-address';
+      existingOrder.updatedAt = Date.now();
+    }
+    await db.write();
+
+    io.to(`user:${req.user.username}`).emit('payment_confirmed', { auctionId, paymentId: razorpay_payment_id, amount: payment.amount });
+    if (auction.createdBy) io.to(`user:${auction.createdBy}`).emit('seller_payment_received', { auctionId, itemTitle: auction.itemTitle, buyer: req.user.username, amount: payment.amount, paymentId: razorpay_payment_id });
+    io.to(`user:${req.user.username}`).emit('order_updated', existingOrder || order);
+    if (auction.createdBy) io.to(`user:${auction.createdBy}`).emit('order_updated', existingOrder || order);
+
+    res.json({ success: true, paymentId: razorpay_payment_id });
+  } catch (err: any) {
+    console.error('Client-confirm payment error:', err);
+    res.status(500).json({ error: 'Payment recording failed' });
+  }
+});
+
 // ── Payment: get status ───────────────────────────────────────────
 app.get('/api/payment/status/:auctionId', authMiddleware, (req: any, res: any) => {
   const paid = db.data.payments.find(p => p.auctionId === req.params.auctionId && p.status === 'paid');
