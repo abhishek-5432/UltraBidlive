@@ -2226,7 +2226,7 @@ function App() {
           </div>
 
           {/* Stats dashboard */}
-          <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 mb-6">
+          <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 xs:gap-2 sm:gap-3 mb-6">
             {[
               { icon: <TrendingUp className="w-4 h-4" />, col: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/40', val: lobbyAuctions.filter(a=>a.status==='Active').length, label: 'Live Now', key: 'active' },
               { icon: <Timer className="w-4 h-4" />, col: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/40', val: lobbyAuctions.filter(a=>a.status==='Upcoming').length, label: 'Upcoming', key: 'upcoming' },
@@ -2288,7 +2288,7 @@ function App() {
                 return (
                   <div className="rounded-3xl overflow-hidden border border-white/[0.07] bg-[#0f0f1a] shadow-2xl shadow-black/40">
                     {/* Hero image */}
-                    <div className="relative h-40 xs:h-44 sm:h-56 md:h-72 overflow-hidden">
+                    <div className="relative h-32 xs:h-40 sm:h-56 md:h-72 overflow-hidden">
                       {fa.itemImage ? (
                         <img src={fa.itemImage} className="w-full h-full object-cover" alt={fa.itemTitle} />
                       ) : (
@@ -2367,7 +2367,7 @@ function App() {
               )}
 
               {/* ── AUCTION CARDS GRID ─────────────────────────────────────── */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 xs:gap-3 sm:gap-4">
                 {gridAuctions.map(auction => {
                   const catColor = CAT_COLORS[auction.category] || '#3b82f6';
                   const isEndingSoon = auction.status === 'Active' && (auction.endTime - lobbyNow) > 0 && (auction.endTime - lobbyNow) < 60000;
@@ -2434,7 +2434,7 @@ function App() {
                       </div>
 
                       {/* Card body */}
-                      <div className="p-4">
+                      <div className="p-3 xs:p-4">
                         {/* Seller / category row */}
                         <div className="flex items-center gap-2 mb-2">
                           {auction.createdBy && (
@@ -2531,7 +2531,7 @@ function App() {
       {/* Winner Overlay */}
       {winnerOverlay && (
         <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-500">
-          <div className="bg-gradient-to-br from-yellow-500 to-amber-600 text-slate-950 rounded-3xl p-6 sm:p-10 shadow-2xl max-w-sm w-full text-center relative">
+          <div className="bg-gradient-to-br from-yellow-500 to-amber-600 text-slate-950 rounded-3xl p-4 xs:p-6 sm:p-10 shadow-2xl max-w-sm w-full text-center relative">
             <button onClick={() => setWinnerOverlay(null)} className="absolute top-4 right-4 p-2 bg-black/20 rounded-xl"><X className="w-4 h-4" /></button>
             <Trophy className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" />
             <p className="text-xs font-semibold opacity-70 mb-2 uppercase tracking-wide">Auction Closed — Winner</p>
@@ -2573,7 +2573,7 @@ function App() {
       {/* Buy Now Confirmation Modal */}
       {buyNowModal && auctionState.buyNowPrice && (
         <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-5 sm:p-8 max-w-sm w-full shadow-2xl text-center">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-4 xs:p-5 sm:p-8 max-w-sm w-full shadow-2xl text-center">
             <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-5">
               <ShoppingCart className="w-8 h-8 text-emerald-400" />
             </div>
@@ -2661,7 +2661,7 @@ function App() {
              </div>
              <button onClick={toggleMute} title={soundMuted ? 'Unmute sounds' : 'Mute sounds'} className="p-2 sm:p-2.5 bg-violet-950/50 rounded-xl border border-violet-900/50 hover:border-violet-500/60 transition-all text-violet-400 hover:text-white">{soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}</button>
              <button onClick={() => { const url = `${window.location.origin}?auction=${auctionState.auctionId}`; navigator.clipboard.writeText(url).then(() => { setCopiedLink(true); addToast('info', 'Auction link copied!'); setTimeout(() => setCopiedLink(false), 2000); }); }} title="Share auction" className="p-2 sm:p-2.5 bg-violet-950/50 rounded-xl border border-violet-900/50 hover:border-violet-500/60 transition-all text-violet-400 hover:text-white">{copiedLink ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}</button>
-             <button onClick={loadProfile} className="flex md:hidden items-center justify-center w-8 h-8 rounded-full flex-shrink-0" style={{ background: myUser?.username ? userColor(myUser.username) : '#7c3aed' }}>
+             <button onClick={loadProfile} className="flex md:hidden items-center justify-center w-9 h-9 sm:w-8 sm:h-8 rounded-full flex-shrink-0" style={{ background: myUser?.username ? userColor(myUser.username) : '#7c3aed' }}>
                 <span className="text-[10px] text-white font-black">{myUser?.username?.[0]?.toUpperCase() || 'U'}</span>
              </button>
              <button onClick={loadProfile} className="hidden md:flex bg-violet-950/60 border border-violet-900/50 rounded-full py-1.5 px-4 items-center gap-3 hover:border-violet-500/60 transition-all">
@@ -2759,14 +2759,14 @@ function App() {
               )}
 
               <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
-                 <div className="grid grid-cols-2 gap-4">
+                 <div className="grid grid-cols-2 gap-2 sm:gap-4">
                     <div className="space-y-1">
                        <p className="text-[10px] text-slate-500 font-medium">Highest Bid</p>
-                       <p key={bidFlashKey} className={clsx('text-2xl font-bold tabular-nums', bidFlashKey > 0 ? 'bid-flash' : 'text-violet-400')}>₹{auctionState.currentBid.toLocaleString()}</p>
+                       <p key={bidFlashKey} className={clsx('text-xl sm:text-2xl font-bold tabular-nums', bidFlashKey > 0 ? 'bid-flash' : 'text-violet-400')}>₹{auctionState.currentBid.toLocaleString()}</p>
                     </div>
                     <div className="space-y-1 text-right">
                        <p className="text-[10px] text-slate-500 font-medium">Starting At</p>
-                       <p className="text-lg font-semibold text-slate-300">₹{auctionState.startingPrice.toLocaleString()}</p>
+                       <p className="text-base sm:text-lg font-semibold text-slate-300">₹{auctionState.startingPrice.toLocaleString()}</p>
                     </div>
                  </div>
 
@@ -2944,7 +2944,7 @@ function App() {
         </div>
 
         <div className={clsx("col-span-12 lg:col-span-6 space-y-6", mobileAuctionTab !== 'video' && 'hidden lg:block')}>
-           <div className="bg-slate-900/50 backdrop-blur-md border border-violet-900/25 rounded-3xl p-2 sm:p-3 shadow-2xl relative overflow-hidden h-[320px] xs:h-[380px] sm:h-[480px] lg:h-[540px] flex flex-col">
+           <div className="bg-slate-900/50 backdrop-blur-md border border-violet-900/25 rounded-3xl p-2 sm:p-3 shadow-2xl relative overflow-hidden h-[220px] xs:h-[280px] sm:h-[400px] md:h-[480px] lg:h-[540px] flex flex-col">
               <div className="absolute top-3 left-3 sm:top-6 sm:left-6 z-20 flex flex-wrap gap-1.5 sm:gap-2 max-w-[60%] sm:max-w-none">
                  {isLive && (
                     <div className="bg-red-600 text-white text-[9px] sm:text-[10px] font-black px-2 sm:px-3 py-1 rounded-full flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-red-500/20 border border-red-500 animate-pulse">
@@ -3030,7 +3030,7 @@ function App() {
                          onFocus={() => { if (!bidAmount) setBidAmount(String(auctionState.currentBid + 100)); }}
                          disabled={moderationLocked}
                          placeholder={`Min ₹${(auctionState.currentBid + 100).toLocaleString()}`}
-                         className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 sm:py-4 px-8 sm:px-10 text-lg sm:text-2xl font-bold text-white focus:outline-none focus:border-violet-500/60 focus:ring-2 focus:ring-violet-500/10 transition-all placeholder:text-slate-700 tabular-nums disabled:opacity-40" 
+                         className="w-full bg-white/5 border border-white/10 rounded-xl py-2 sm:py-4 px-6 sm:px-10 text-base sm:text-xl md:text-2xl font-bold text-white focus:outline-none focus:border-violet-500/60 focus:ring-2 focus:ring-violet-500/10 transition-all placeholder:text-slate-700 tabular-nums disabled:opacity-40" 
                        />
                     </div>
                     <button 
@@ -3078,7 +3078,7 @@ function App() {
                          <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black text-white" style={{ background: userColor(b.userId) }}>{b.userId[0]?.toUpperCase()}</div>
                          <span className={clsx('absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-black border border-slate-900', i === 0 ? 'bg-yellow-500 text-slate-950' : i === 1 ? 'bg-slate-400 text-slate-950' : 'bg-amber-700 text-white')}>{i+1}</span>
                        </div>
-                       <span className="flex-1 text-xs font-medium text-white">{b.userId}{b.userId === myUser?.username && <span className="ml-1.5 text-yellow-400 text-[10px]">(you)</span>}</span>
+                       <span className="flex-1 text-xs font-medium text-white truncate">{b.userId}{b.userId === myUser?.username && <span className="ml-1.5 text-yellow-400 text-[10px]">(you)</span>}</span>
                        <span className="text-xs font-semibold text-violet-400">₹{b.amount.toLocaleString()}</span>
                      </div>
                    ))}
@@ -3089,7 +3089,7 @@ function App() {
         </div>
 
            <div className={clsx("col-span-12 lg:col-span-3", mobileAuctionTab !== 'chat' && 'hidden lg:block')}>
-           <div className="bg-slate-900/50 backdrop-blur-md border border-violet-900/25 rounded-3xl flex flex-col h-[500px] sm:h-[600px] lg:h-[744px] shadow-2xl">
+           <div className="bg-slate-900/50 backdrop-blur-md border border-violet-900/25 rounded-3xl flex flex-col h-[320px] xs:h-[380px] sm:h-[480px] md:h-[560px] lg:h-[744px] shadow-2xl">
               {/* Tabs */}
               <div className="p-4 border-b border-slate-800/50 flex gap-2">
                 <button onClick={() => setRightTab('bids')} className={clsx('flex-1 py-2 rounded-lg font-medium text-xs transition-all flex items-center justify-center gap-1.5', rightTab === 'bids' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-500 hover:text-white bg-white/[0.03] hover:bg-white/8')}>
