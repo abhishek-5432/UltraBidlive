@@ -1228,4 +1228,4 @@ setInterval(async () => {
 }, 1000);
 
 const PORT = Number(process.env.PORT) || 3001;
-httpServer.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
+httpServer.listen(PORT, '0.0.0.0', () => console.log(`Backend listening on 0.0.0.0:${PORT}`));

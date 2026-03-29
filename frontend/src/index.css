@@ -9,6 +9,8 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
   }
 
   h1, h2, h3, .brand-font {
@@ -47,5 +49,87 @@
   }
   .hover-lift:hover {
     transform: translateY(-2px);
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Mobile-specific: prevent horizontal scroll and improve touch */
+@media (max-width: 639px) {
+  html, body {
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+  input, select, textarea {
+    font-size: 16px !important; /* Prevent iOS zoom on focus */
+  }
+  .max-w-7xl {
+    max-width: 100%;
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  /* Better touch targets on mobile */
+  button, a, [role="button"] {
+    min-height: 36px;
+  }
+  /* Prevent horizontal overflow from fixed-width elements */
+  .grid {
+    max-width: 100%;
+  }
+
+  /* ── MOBILE PERFORMANCE: disable heavy GPU effects ── */
+  /* backdrop-blur is extremely expensive on mobile GPUs */
+  .backdrop-blur-xl,
+  .backdrop-blur-md,
+  .backdrop-blur-sm,
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .glass-card {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background: rgba(15, 10, 30, 0.92) !important;
+  }
+  /* Reduce ambient blur orbs (very heavy on mobile) */
+  [class*="blur-[120px]"],
+  [class*="blur-[130px]"],
+  [class*="blur-[160px]"] {
+    display: none !important;
+  }
+  /* Disable hover transforms on touch */
+  .hover-lift:hover {
+    transform: none;
+  }
+  /* Reduce animation overhead */
+  .animate-pulse {
+    animation-duration: 3s;
+  }
+  /* Force GPU compositing for scrolling containers */
+  .overflow-y-auto,
+  .overflow-x-auto {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+}
+
+/* Safe area for notched phones */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* Respect OS reduce-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

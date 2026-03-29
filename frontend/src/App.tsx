@@ -20,13 +20,15 @@ const REACTION_EMOJI: Record<string,string> = { FIRE:'🔥', CLAP:'👏', MONEY:
 function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
 function launchConfetti() {
+  const isMobile = window.innerWidth < 640;
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999';
   document.body.appendChild(canvas);
   const ctx = canvas.getContext('2d')!;
   canvas.width = window.innerWidth; canvas.height = window.innerHeight;
   const colors = ['#3b82f6','#6366f1','#f59e0b','#10b981','#ef4444','#fff'];
-  const pieces = Array.from({ length: 150 }, () => ({
+  const count = isMobile ? 50 : 150;
+  const pieces = Array.from({ length: count }, () => ({
     x: Math.random()*canvas.width, y: -20, w: Math.random()*10+5, h: Math.random()*5+3,
     color: colors[Math.floor(Math.random()*colors.length)],
     vx: (Math.random()-0.5)*4, vy: Math.random()*4+2,
@@ -275,6 +277,7 @@ function App() {
   const [soundMuted, setSoundMuted] = useState(false);
   const soundMutedRef = useRef(false);
   const toggleMute = () => { setSoundMuted(prev => { soundMutedRef.current = !prev; return !prev; }); };
+  const [mobileAuctionTab, setMobileAuctionTab] = useState<'video' | 'details' | 'chat'>('video');
   const [winnerOverlay, setWinnerOverlay] = useState<{ winner: string; amount: number; auctionId: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -1442,7 +1445,7 @@ function App() {
            </div>
 
            {/* Right — form panel */}
-           <div className="flex-1 flex items-center justify-center p-8 lg:p-14 relative">
+           <div className="flex-1 flex items-center justify-center p-5 sm:p-8 lg:p-14 relative">
               <div className="fixed inset-0 lg:hidden pointer-events-none">
                  <div className="absolute top-[-15%] left-[-10%] w-[50%] h-[50%] bg-violet-700/20 rounded-full blur-[130px] animate-pulse"></div>
                  <div className="absolute bottom-[-15%] right-[-10%] w-[45%] h-[45%] bg-fuchsia-700/15 rounded-full blur-[130px] animate-pulse delay-700"></div>
@@ -1535,7 +1538,7 @@ function App() {
 
   // Toast helper component inline
   const Toasts = () => (
-    <div className="fixed top-6 right-6 z-[100] space-y-2 pointer-events-none max-w-sm">
+    <div className="fixed top-3 right-3 sm:top-6 sm:right-6 z-[100] space-y-2 pointer-events-none max-w-[calc(100vw-1.5rem)] sm:max-w-sm">
       {toasts.map(t => (
         <div key={t.id} className={clsx('px-5 py-3 rounded-xl font-medium text-sm shadow-xl border animate-in slide-in-from-right-4 duration-300', {
           'bg-red-600/90 border-red-500 text-white': t.type === 'outbid' || t.type === 'error',
@@ -1546,8 +1549,8 @@ function App() {
     </div>
   );
   const ProfileModal = () => !showProfile || !profileData ? null : (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-      <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 w-full max-w-4xl shadow-2xl max-h-[85vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <div className="bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-3xl p-5 sm:p-8 w-full max-w-4xl shadow-2xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6"><h2 className="text-xl font-bold text-white" style={{fontFamily:"'Space Grotesk',sans-serif"}}>My Profile</h2><button onClick={() => setShowProfile(false)} className="p-2 hover:bg-slate-800 rounded-lg"><X className="w-5 h-5 text-slate-400" /></button></div>
         <div className="flex items-center gap-4 mb-6 p-4 bg-white/[0.03] border border-white/8 rounded-2xl"><div className="w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-md" style={{ background: userColor(profileData.username) }}>{profileData.username?.[0]?.toUpperCase()}</div><div><p className="font-semibold text-white text-lg">{profileData.username}</p>{(profileData.email || myUser?.email) && <p className="text-slate-400 text-xs mt-0.5 break-all">{profileData.email || myUser?.email}</p>}<p className="text-slate-500 text-xs mt-1">{profileData.totalBids} bids · {profileData.wins} wins</p></div></div>
         <div className="grid grid-cols-2 gap-3 mb-6">
@@ -1733,8 +1736,8 @@ function App() {
     </div>
   );
   const AddressModal = () => !showAddressModal ? null : (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-center justify-center p-6">
-      <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 w-full max-w-2xl shadow-2xl max-h-[85vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[70] flex items-end sm:items-center justify-center p-0 sm:p-6">
+      <div className="bg-slate-900 border border-slate-700 rounded-t-3xl sm:rounded-3xl p-5 sm:p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h2 className="text-xl font-bold text-white" style={{fontFamily:"'Space Grotesk',sans-serif"}}>Delivery Address</h2>
@@ -1757,10 +1760,10 @@ function App() {
     </div>
   );
   const CreateAuctionModal = () => !showCreateAuction ? null : (
-    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700/80 rounded-3xl w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[95vh]">
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-slate-900 border border-slate-700/80 rounded-t-3xl sm:rounded-3xl w-full max-w-2xl shadow-2xl overflow-y-auto max-h-[95vh]">
         {/* Header */}
-        <div className="flex items-center justify-between px-7 pt-7 pb-5 border-b border-slate-800">
+        <div className="flex items-center justify-between px-4 sm:px-7 pt-5 sm:pt-7 pb-4 sm:pb-5 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/25"><Tag className="w-5 h-5 text-white" /></div>
             <div><h2 className="text-xl font-bold text-white" style={{fontFamily:"'Space Grotesk',sans-serif"}}>Sell Your Product</h2><p className="text-xs text-slate-500 mt-0.5">List it as a live auction</p></div>
@@ -1768,7 +1771,7 @@ function App() {
           <button onClick={() => setShowCreateAuction(false)} className="p-2 hover:bg-slate-800 rounded-xl transition-all"><X className="w-5 h-5 text-slate-400" /></button>
         </div>
 
-        <form onSubmit={handleCreateAuction} className="p-7 space-y-6">
+        <form onSubmit={handleCreateAuction} className="p-4 sm:p-7 space-y-5 sm:space-y-6">
           {(() => {
             const minimumScheduleDate = formatDateLocal(Date.now() + 60_000);
             const minimumScheduleTime = formatTimeLocal(Date.now() + 60_000);
@@ -2035,16 +2038,16 @@ function App() {
         </div>
         <Toasts /><ProfileModal /><AddressModal />{CreateAuctionModal()}
         <header className="border-b border-white/[0.06] bg-[#09090f]/95 backdrop-blur-xl sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/30">
-                <TrendingUp className="w-5 h-5 text-white" />
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-xl flex items-center justify-center shadow-lg shadow-violet-500/30">
+                <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-[17px] font-bold tracking-tight text-white" style={{fontFamily:"'Space Grotesk', sans-serif"}}>UltraBid Live</h1>
+                <h1 className="text-sm sm:text-[17px] font-bold tracking-tight text-white" style={{fontFamily:"'Space Grotesk', sans-serif"}}>UltraBid Live</h1>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-3">
               <div className="relative">
                 <button onClick={() => setShowNotifications(v => !v)} className="relative p-2 bg-white/5 border border-white/10 rounded-lg hover:border-white/20 transition-all">
                   <Bell className="w-4 h-4 text-slate-400" />
@@ -2053,7 +2056,7 @@ function App() {
                   )}
                 </button>
                 {showNotifications && (
-                  <div className="absolute right-0 top-11 w-80 bg-[#12101f] border border-white/10 rounded-xl shadow-2xl z-[200] overflow-hidden">
+                  <div className="absolute right-0 top-11 w-[calc(100vw-1.5rem)] sm:w-80 max-w-80 bg-[#12101f] border border-white/10 rounded-xl shadow-2xl z-[200] overflow-hidden">
                     <div className="px-4 py-3 border-b border-white/8 flex justify-between items-center">
                       <div>
                         <p className="text-sm font-semibold text-white">Notifications</p>
@@ -2080,55 +2083,59 @@ function App() {
                   </div>
                 )}
               </div>
-              <button onClick={() => setShowCreateAuction(true)} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white px-4 py-2 rounded-lg font-medium text-sm flex items-center gap-2 transition-all shadow-md shadow-emerald-500/20"><Tag className="w-3.5 h-3.5" /> Sell</button>
-              <button onClick={loadProfile} className="flex items-center gap-2 rounded-full px-3 py-1.5 bg-white/5 border border-white/10 hover:border-white/20 transition-all">
+              <button onClick={() => setShowCreateAuction(true)} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 transition-all shadow-md shadow-emerald-500/20"><Tag className="w-3.5 h-3.5" /><span className="hidden xs:inline">Sell</span></button>
+              <button onClick={loadProfile} className="flex items-center gap-2 rounded-full px-2 sm:px-3 py-1.5 bg-white/5 border border-white/10 hover:border-white/20 transition-all">
                 <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-semibold flex-shrink-0" style={{ background: myUser?.username ? userColor(myUser.username) : '#7c3aed' }}>{myUser?.username?.[0]?.toUpperCase()}</div>
                 <div className="hidden sm:block text-left leading-tight">
                   <p className="text-sm font-medium text-slate-300">{myUser?.username}</p>
                   {myUser?.email && <p className="text-[11px] text-slate-500">{myUser.email}</p>}
                 </div>
               </button>
-              <button onClick={handleLogout} className="text-slate-500 hover:text-slate-300 text-sm font-medium transition-colors px-2">Sign out</button>
+              <button onClick={handleLogout} className="text-slate-500 hover:text-slate-300 text-xs sm:text-sm font-medium transition-colors px-1 sm:px-2 hidden sm:block">Sign out</button>
             </div>
           </div>
         </header>
-        <main className="max-w-7xl mx-auto px-6 py-8 relative z-10">
-          <div className="flex items-center justify-between mb-6">
+        <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-2">
             <div>
-              <h2 className="text-2xl font-bold text-white tracking-tight" style={{fontFamily:"'Space Grotesk', sans-serif"}}>Live Auctions</h2>
-              <p className="text-slate-500 text-sm mt-0.5">{lobbyAuctions.length} auction{lobbyAuctions.length !== 1 ? 's' : ''} available</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight" style={{fontFamily:"'Space Grotesk', sans-serif"}}>Live Auctions</h2>
+              <p className="text-slate-500 text-xs sm:text-sm mt-0.5">{lobbyAuctions.length} auction{lobbyAuctions.length !== 1 ? 's' : ''} available</p>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              <button onClick={() => { setLobbyTab('all'); setLobbyFilter('all'); }} className={clsx('px-4 py-2 rounded-lg font-medium text-sm transition-all border', lobbyTab === 'all' && lobbyFilter === 'all' ? 'bg-violet-600 border-violet-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/20')}>All</button>
-              <button onClick={() => { setLobbyTab('watchlist'); setLobbyFilter('watchlist'); }} className={clsx('px-4 py-2 rounded-lg font-medium text-sm transition-all border flex items-center gap-1.5', lobbyTab === 'watchlist' ? 'bg-yellow-500 border-yellow-400 text-slate-950 shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}><Star className="w-3.5 h-3.5" /> Watchlist {watchlist.length > 0 && <span className={clsx('rounded-full px-1.5 text-xs font-semibold', lobbyTab === 'watchlist' ? 'bg-yellow-900/40 text-yellow-950' : 'bg-yellow-500/15 text-yellow-400')}>{watchlist.length}</span>}</button>
-              <button onClick={() => { setLobbyTab('all'); setLobbyFilter('mine'); }} className={clsx('px-4 py-2 rounded-lg font-medium text-sm transition-all border flex items-center gap-1.5', lobbyFilter === 'mine' ? 'bg-emerald-600 border-emerald-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}><ListChecks className="w-3.5 h-3.5" /> My Listings {lobbyAuctions.filter(a=>a.createdBy===myUser?.username).length > 0 && <span className={clsx('rounded-full px-1.5 text-xs font-semibold', lobbyFilter === 'mine' ? 'bg-white/20 text-white' : 'bg-emerald-500/15 text-emerald-400')}>{lobbyAuctions.filter(a=>a.createdBy===myUser?.username).length}</span>}</button>
+            <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none flex-shrink-0">
+              <button onClick={() => { setLobbyTab('all'); setLobbyFilter('all'); }} className={clsx('px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm transition-all border whitespace-nowrap', lobbyTab === 'all' && lobbyFilter === 'all' ? 'bg-violet-600 border-violet-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-white/20')}>All</button>
+              <button onClick={() => { setLobbyTab('watchlist'); setLobbyFilter('watchlist'); }} className={clsx('px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm transition-all border flex items-center gap-1.5 whitespace-nowrap', lobbyTab === 'watchlist' ? 'bg-yellow-500 border-yellow-400 text-slate-950 shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}><Star className="w-3.5 h-3.5" /> Watchlist {watchlist.length > 0 && <span className={clsx('rounded-full px-1.5 text-xs font-semibold', lobbyTab === 'watchlist' ? 'bg-yellow-900/40 text-yellow-950' : 'bg-yellow-500/15 text-yellow-400')}>{watchlist.length}</span>}</button>
+              <button onClick={() => { setLobbyTab('all'); setLobbyFilter('mine'); }} className={clsx('px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm transition-all border flex items-center gap-1.5 whitespace-nowrap', lobbyFilter === 'mine' ? 'bg-emerald-600 border-emerald-500 text-white shadow-md' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white')}><ListChecks className="w-3.5 h-3.5" /> My Listings {lobbyAuctions.filter(a=>a.createdBy===myUser?.username).length > 0 && <span className={clsx('rounded-full px-1.5 text-xs font-semibold', lobbyFilter === 'mine' ? 'bg-white/20 text-white' : 'bg-emerald-500/15 text-emerald-400')}>{lobbyAuctions.filter(a=>a.createdBy===myUser?.username).length}</span>}</button>
             </div>
           </div>
 
           {/* Search + Category Filter */}
-          <div className="flex flex-col sm:flex-row gap-3 mb-5">
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search auctions..." className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-10 pr-10 text-sm text-white placeholder:text-slate-600 focus:border-violet-500/60 focus:bg-violet-500/5 outline-none transition-all" />
-              {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-700 rounded-lg transition-all text-slate-400 hover:text-white"><X className="w-3.5 h-3.5" /></button>}
+          <div className="flex flex-col gap-3 mb-5">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search auctions..." className="w-full bg-white/5 border border-white/10 rounded-lg py-2.5 pl-10 pr-10 text-sm text-white placeholder:text-slate-600 focus:border-violet-500/60 focus:bg-violet-500/5 outline-none transition-all" />
+                {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-700 rounded-lg transition-all text-slate-400 hover:text-white"><X className="w-3.5 h-3.5" /></button>}
+              </div>
+              <div className="flex gap-2">
+                <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:border-violet-500/60 outline-none cursor-pointer flex-1 sm:flex-initial font-medium">
+                  <option value="newest">Sort: Newest</option>
+                  <option value="bids">Sort: Most Bids</option>
+                  <option value="ending">Sort: Ending Soon</option>
+                  <option value="price_low">Sort: Price ↑</option>
+                  <option value="price_high">Sort: Price ↓</option>
+                </select>
+                <button onClick={saveCurrentSearch} className="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-500/25 bg-violet-500/10 px-3 py-2.5 text-sm font-medium text-violet-300 hover:bg-violet-500/20 flex-shrink-0 whitespace-nowrap">
+                  <Star className="w-4 h-4" /><span className="hidden xs:inline">Save search</span>
+                </button>
+              </div>
             </div>
-            <select value={sortBy} onChange={e => setSortBy(e.target.value as typeof sortBy)} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:border-violet-500/60 outline-none cursor-pointer flex-shrink-0 font-medium">
-              <option value="newest">Sort: Newest</option>
-              <option value="bids">Sort: Most Bids</option>
-              <option value="ending">Sort: Ending Soon</option>
-              <option value="price_low">Sort: Price ↑</option>
-              <option value="price_high">Sort: Price ↓</option>
-            </select>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 flex-shrink-0">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
               {['All','General','Electronics','Antiques','Art','Jewelry','Vehicles','Collectibles'].map(cat => (
                 <button key={cat} onClick={() => setCategoryFilter(cat)} className={clsx('px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1', categoryFilter === cat ? 'bg-violet-600/90 text-white shadow-md' : 'bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:border-white/20')}>
                   <span>{CAT_EMOJIS[cat]}</span>{cat}
                 </button>
               ))}
             </div>
-            <button onClick={saveCurrentSearch} className="inline-flex items-center justify-center gap-2 rounded-lg border border-violet-500/25 bg-violet-500/10 px-3 py-2.5 text-sm font-medium text-violet-300 hover:bg-violet-500/20 flex-shrink-0">
-              <Star className="w-4 h-4" /> Save search
-            </button>
           </div>
 
           {(savedSearches.length > 0 || recommendations.length > 0) && (
@@ -2219,7 +2226,7 @@ function App() {
           </div>
 
           {/* Stats dashboard */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 mb-6">
             {[
               { icon: <TrendingUp className="w-4 h-4" />, col: 'text-green-400', bg: 'bg-green-500/10', border: 'border-green-500/40', val: lobbyAuctions.filter(a=>a.status==='Active').length, label: 'Live Now', key: 'active' },
               { icon: <Timer className="w-4 h-4" />, col: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/40', val: lobbyAuctions.filter(a=>a.status==='Upcoming').length, label: 'Upcoming', key: 'upcoming' },
@@ -2231,9 +2238,9 @@ function App() {
             ].map((s, i) => {
               const isActive = lobbyFilter === s.key;
               return (
-              <button key={i} onClick={() => { setLobbyFilter(s.key as typeof lobbyFilter); if (s.key === 'watchlist') setLobbyTab('watchlist'); else setLobbyTab('all'); }} className={clsx('bg-white/[0.04] border rounded-xl p-3 flex items-center gap-2.5 transition-all cursor-pointer w-full text-left hover:bg-white/[0.07]', isActive ? [s.border, 'ring-1'] : 'border-white/[0.07] hover:border-white/15')}>
-                <div className={clsx('w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0', s.col, s.bg)}>{s.icon}</div>
-                <div><p className={clsx('text-xl font-bold tabular-nums leading-tight', s.col)}>{s.val}</p><p className="text-[10px] text-slate-500 font-medium mt-0.5">{s.label}</p></div>
+              <button key={i} onClick={() => { setLobbyFilter(s.key as typeof lobbyFilter); if (s.key === 'watchlist') setLobbyTab('watchlist'); else setLobbyTab('all'); }} className={clsx('bg-white/[0.04] border rounded-xl p-2 sm:p-3 flex items-center gap-1.5 sm:gap-2.5 transition-all cursor-pointer w-full text-left hover:bg-white/[0.07]', isActive ? [s.border, 'ring-1'] : 'border-white/[0.07] hover:border-white/15')}>
+                <div className={clsx('w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center flex-shrink-0', s.col, s.bg)}>{s.icon}</div>
+                <div><p className={clsx('text-base sm:text-xl font-bold tabular-nums leading-tight', s.col)}>{s.val}</p><p className="text-[9px] sm:text-[10px] text-slate-500 font-medium mt-0.5 truncate">{s.label}</p></div>
               </button>
             );})}
           </div>
@@ -2281,7 +2288,7 @@ function App() {
                 return (
                   <div className="rounded-3xl overflow-hidden border border-white/[0.07] bg-[#0f0f1a] shadow-2xl shadow-black/40">
                     {/* Hero image */}
-                    <div className="relative h-56 sm:h-72 overflow-hidden">
+                    <div className="relative h-40 xs:h-44 sm:h-56 md:h-72 overflow-hidden">
                       {fa.itemImage ? (
                         <img src={fa.itemImage} className="w-full h-full object-cover" alt={fa.itemTitle} />
                       ) : (
@@ -2302,21 +2309,21 @@ function App() {
                       </button>
                     </div>
                     {/* Details */}
-                    <div className="p-6">
+                    <div className="p-4 sm:p-6">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <p className="text-xs text-slate-500">{fa.category}{fa.createdBy ? ` · by ${fa.createdBy}` : ''}</p>
                         <span className={clsx('inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full', sellerTrustMeta.className)}><TrustIcon className="w-3 h-3" />{sellerTrustMeta.label}</span>
                       </div>
-                      <h3 className="text-2xl font-bold text-white leading-tight mb-5" style={{fontFamily:"'Space Grotesk',sans-serif"}}>{fa.itemTitle}</h3>
-                      {fa.description && <p className="text-sm text-slate-400 leading-relaxed mb-5 line-clamp-2">{fa.description}</p>}
-                      <div className="flex items-end gap-8 mb-5">
+                      <h3 className="text-xl sm:text-2xl font-bold text-white leading-tight mb-3 sm:mb-5" style={{fontFamily:"'Space Grotesk',sans-serif"}}>{fa.itemTitle}</h3>
+                      {fa.description && <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-3 sm:mb-5 line-clamp-2">{fa.description}</p>}
+                      <div className="flex flex-wrap items-end gap-3 sm:gap-8 mb-5">
                         <div>
                           <p className="text-[10px] text-slate-500 font-medium tracking-widest uppercase mb-0.5">Current Bid</p>
-                          <p className="text-3xl font-bold text-white tabular-nums" style={{fontFamily:"'Space Grotesk',sans-serif"}}>₹{fa.currentBid.toLocaleString()}</p>
+                          <p className="text-2xl sm:text-3xl font-bold text-white tabular-nums" style={{fontFamily:"'Space Grotesk',sans-serif"}}>₹{fa.currentBid.toLocaleString()}</p>
                         </div>
                         <div>
                           <p className="text-[10px] text-slate-500 font-medium tracking-widest uppercase mb-0.5">{fa.status === 'Upcoming' ? 'Starts In' : 'Ends In'}</p>
-                          <p className={clsx('text-2xl font-bold tabular-nums', fa.status === 'Upcoming' ? 'text-violet-400' : faEndingSoon ? 'text-red-400 animate-pulse' : 'text-emerald-400')} style={{fontFamily:"'Space Grotesk',sans-serif"}}>
+                          <p className={clsx('text-xl sm:text-2xl font-bold tabular-nums', fa.status === 'Upcoming' ? 'text-violet-400' : faEndingSoon ? 'text-red-400 animate-pulse' : 'text-emerald-400')} style={{fontFamily:"'Space Grotesk',sans-serif"}}>
                             {fa.status === 'Upcoming'
                               ? `${String(Math.floor(Math.max(0, faStartsIn) / 3600000)).padStart(2,'0')}h ${String(Math.floor((Math.max(0, faStartsIn) % 3600000) / 60000)).padStart(2,'0')}m`
                               : faEndsIn > 0 ? `${String(Math.floor(faMins/60)).padStart(2,'0')}h ${String(faMins%60).padStart(2,'0')}m ${String(faSecs).padStart(2,'0')}s` : 'Ended'}
@@ -2379,13 +2386,13 @@ function App() {
                   const TrustIcon = sellerTrustMeta.icon;
                   return (
                     <div key={auction.id} className={clsx(
-                      'bg-[#0f0f1a] border rounded-2xl overflow-hidden transition-all duration-300 group cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/50',
+                      'bg-[#0f0f1a] border rounded-2xl overflow-hidden transition-all duration-200 group cursor-pointer',
                       isEndingSoon ? 'border-red-500/40 shadow-red-500/10 shadow-lg' : isWinning ? 'border-yellow-500/30' : 'border-white/[0.06] hover:border-white/15'
                     )}>
                       {/* Card image */}
                       <div className="relative aspect-[16/10] bg-slate-950 overflow-hidden">
                         {(auction.itemImages?.[0] || auction.itemImage) ? (
-                          <img src={auction.itemImages?.[0] || auction.itemImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={auction.itemTitle} />
+                          <img loading="lazy" src={auction.itemImages?.[0] || auction.itemImage} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={auction.itemTitle} />
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center gap-2">
                             <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{background: catColor + '15'}}><TrendingUp className="w-6 h-6" style={{color: catColor}} /></div>
@@ -2523,13 +2530,13 @@ function App() {
 
       {/* Winner Overlay */}
       {winnerOverlay && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in duration-500">
-          <div className="bg-gradient-to-br from-yellow-500 to-amber-600 text-slate-950 rounded-3xl p-10 shadow-2xl max-w-sm w-full text-center relative">
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-500">
+          <div className="bg-gradient-to-br from-yellow-500 to-amber-600 text-slate-950 rounded-3xl p-6 sm:p-10 shadow-2xl max-w-sm w-full text-center relative">
             <button onClick={() => setWinnerOverlay(null)} className="absolute top-4 right-4 p-2 bg-black/20 rounded-xl"><X className="w-4 h-4" /></button>
-            <Trophy className="w-16 h-16 mx-auto mb-4" />
+            <Trophy className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" />
             <p className="text-xs font-semibold opacity-70 mb-2 uppercase tracking-wide">Auction Closed — Winner</p>
-            <p className="text-3xl font-bold" style={{fontFamily:"'Space Grotesk',sans-serif"}}>{winnerOverlay.winner}</p>
-            <p className="text-5xl font-bold tabular-nums mt-3" style={{fontFamily:"'Space Grotesk',sans-serif"}}>₹{winnerOverlay.amount?.toLocaleString()}</p>
+            <p className="text-2xl sm:text-3xl font-bold" style={{fontFamily:"'Space Grotesk',sans-serif"}}>{winnerOverlay.winner}</p>
+            <p className="text-3xl sm:text-5xl font-bold tabular-nums mt-3" style={{fontFamily:"'Space Grotesk',sans-serif"}}>₹{winnerOverlay.amount?.toLocaleString()}</p>
             {winnerOverlay.winner === myUser?.username && (
               paidAuctions.has(winnerOverlay.auctionId) ? (
                 <div className="mt-5 space-y-3">
@@ -2565,8 +2572,8 @@ function App() {
       )}
       {/* Buy Now Confirmation Modal */}
       {buyNowModal && auctionState.buyNowPrice && (
-        <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-6 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-8 max-w-sm w-full shadow-2xl text-center">
+        <div className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-5 sm:p-8 max-w-sm w-full shadow-2xl text-center">
             <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-5">
               <ShoppingCart className="w-8 h-8 text-emerald-400" />
             </div>
@@ -2589,15 +2596,15 @@ function App() {
       ))}
 
       <header className="relative w-full border-b border-white/[0.06] bg-[#09090f]/90 backdrop-blur-xl z-50">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button onClick={() => { if (isBroadcaster) stopBroadcast(); socket.emit('leave_auction', auctionState.auctionId); setView('lobby'); }} className="p-2 hover:bg-white/8 rounded-lg transition-all text-slate-400 hover:text-white"><ChevronLeft className="w-5 h-5" /></button>
-            <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-lg flex items-center justify-center shadow-md shadow-violet-500/20">
-               <TrendingUp className="w-4 h-4 text-white" />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <button onClick={() => { if (isBroadcaster) stopBroadcast(); socket.emit('leave_auction', auctionState.auctionId); setView('lobby'); }} className="p-1.5 sm:p-2 hover:bg-white/8 rounded-lg transition-all text-slate-400 hover:text-white flex-shrink-0"><ChevronLeft className="w-5 h-5" /></button>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-lg flex items-center justify-center shadow-md shadow-violet-500/20 flex-shrink-0">
+               <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white" />
             </div>
-            <div>
-              <h1 className="text-[17px] font-bold tracking-tight text-white" style={{fontFamily:"'Space Grotesk', sans-serif"}}>UltraBid Live</h1>
-              <p className="text-[10px] text-slate-500 -mt-0.5 truncate max-w-[180px]">{auctionState.itemTitle}</p>
+            <div className="min-w-0">
+              <h1 className="text-sm sm:text-[17px] font-bold tracking-tight text-white" style={{fontFamily:"'Space Grotesk', sans-serif"}}>UltraBid Live</h1>
+              <p className="text-[10px] text-slate-500 -mt-0.5 truncate max-w-[120px] sm:max-w-[180px]">{auctionState.itemTitle}</p>
             </div>
           </div>
 
@@ -2616,16 +2623,16 @@ function App() {
              </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
              <div className="relative">
-               <button onClick={() => setShowNotifications(v => !v)} className="relative p-2.5 bg-violet-950/50 rounded-xl border border-violet-900/50 hover:border-violet-500/60 transition-all text-violet-400 hover:text-white">
+               <button onClick={() => setShowNotifications(v => !v)} className="relative p-2 sm:p-2.5 bg-violet-950/50 rounded-xl border border-violet-900/50 hover:border-violet-500/60 transition-all text-violet-400 hover:text-white">
                  <Bell className="w-4 h-4" />
                  {notifications.filter(n => !n.read).length > 0 && (
                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-fuchsia-500 rounded-full text-[9px] font-black text-white flex items-center justify-center">{Math.min(9, notifications.filter(n => !n.read).length)}</span>
                  )}
                </button>
                {showNotifications && (
-                 <div className="absolute right-0 top-12 w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-[200] overflow-hidden">
+                 <div className="absolute right-0 top-12 w-[calc(100vw-1.5rem)] sm:w-80 max-w-80 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-[200] overflow-hidden">
                    <div className="p-4 border-b border-slate-800 flex justify-between items-center">
                      <div>
                        <p className="text-xs font-semibold text-white uppercase tracking-wide">Notifications</p>
@@ -2652,9 +2659,12 @@ function App() {
                  </div>
                )}
              </div>
-             <button onClick={toggleMute} title={soundMuted ? 'Unmute sounds' : 'Mute sounds'} className="p-2.5 bg-violet-950/50 rounded-xl border border-violet-900/50 hover:border-violet-500/60 transition-all text-violet-400 hover:text-white">{soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}</button>
-             <button onClick={() => { const url = `${window.location.origin}?auction=${auctionState.auctionId}`; navigator.clipboard.writeText(url).then(() => { setCopiedLink(true); addToast('info', 'Auction link copied!'); setTimeout(() => setCopiedLink(false), 2000); }); }} title="Share auction" className="p-2.5 bg-violet-950/50 rounded-xl border border-violet-900/50 hover:border-violet-500/60 transition-all text-violet-400 hover:text-white">{copiedLink ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}</button>
-             <button onClick={loadProfile} className="bg-violet-950/60 border border-violet-900/50 rounded-full py-1.5 px-4 flex items-center gap-3 hover:border-violet-500/60 transition-all">
+             <button onClick={toggleMute} title={soundMuted ? 'Unmute sounds' : 'Mute sounds'} className="p-2 sm:p-2.5 bg-violet-950/50 rounded-xl border border-violet-900/50 hover:border-violet-500/60 transition-all text-violet-400 hover:text-white">{soundMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}</button>
+             <button onClick={() => { const url = `${window.location.origin}?auction=${auctionState.auctionId}`; navigator.clipboard.writeText(url).then(() => { setCopiedLink(true); addToast('info', 'Auction link copied!'); setTimeout(() => setCopiedLink(false), 2000); }); }} title="Share auction" className="p-2 sm:p-2.5 bg-violet-950/50 rounded-xl border border-violet-900/50 hover:border-violet-500/60 transition-all text-violet-400 hover:text-white">{copiedLink ? <Check className="w-4 h-4 text-green-400" /> : <Copy className="w-4 h-4" />}</button>
+             <button onClick={loadProfile} className="flex md:hidden items-center justify-center w-8 h-8 rounded-full flex-shrink-0" style={{ background: myUser?.username ? userColor(myUser.username) : '#7c3aed' }}>
+                <span className="text-[10px] text-white font-black">{myUser?.username?.[0]?.toUpperCase() || 'U'}</span>
+             </button>
+             <button onClick={loadProfile} className="hidden md:flex bg-violet-950/60 border border-violet-900/50 rounded-full py-1.5 px-4 items-center gap-3 hover:border-violet-500/60 transition-all">
                 <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] text-white font-black border border-violet-800/50 flex-shrink-0" style={{ background: myUser?.username ? userColor(myUser.username) : '#7c3aed' }}>
                   {myUser?.username?.[0] || 'U'}
                 </div>
@@ -2663,7 +2673,7 @@ function App() {
                   {myUser?.email && <p className="text-[10px] text-violet-300/70">{myUser.email}</p>}
                 </div>
              </button>
-             <button onClick={handleLogout} className="bg-white/5 text-slate-400 px-4 py-1.5 rounded-lg font-medium text-sm hover:text-red-400 hover:bg-red-900/20 border border-white/10 transition-all">
+             <button onClick={handleLogout} className="hidden sm:block bg-white/5 text-slate-400 px-4 py-1.5 rounded-lg font-medium text-sm hover:text-red-400 hover:bg-red-900/20 border border-white/10 transition-all">
                 Sign out
              </button>
           </div>
@@ -2679,19 +2689,19 @@ function App() {
 
       {isUpcoming && (
         <div className="w-full bg-violet-600/15 border-b border-violet-500/20">
-          <div className="max-w-7xl mx-auto px-6 py-2 flex items-center justify-between gap-3 text-xs">
+          <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1 sm:gap-3 text-xs">
             <span className="text-violet-300 font-medium">Upcoming auction • starts in {formatTime(startCountdown)}</span>
             <span className="text-violet-400/70">Bidding unlocks automatically at launch time</span>
           </div>
         </div>
       )}
 
-      <main className="relative max-w-7xl mx-auto px-6 py-8 grid grid-cols-12 gap-6 z-10">
-        <div className="col-span-12 lg:col-span-3 space-y-6">
+      <main className="relative max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-8 grid grid-cols-12 gap-3 sm:gap-6 z-10 pb-20 lg:pb-8">
+        <div className={clsx("col-span-12 lg:col-span-3 space-y-6", mobileAuctionTab !== 'details' && 'hidden lg:block')}>
            <div className="bg-slate-900/50 backdrop-blur-md border border-violet-900/25 rounded-3xl overflow-hidden shadow-2xl relative group">
-              <div className="p-6 border-b border-slate-800/50 flex justify-between items-start">
+              <div className="p-4 sm:p-6 border-b border-slate-800/50 flex justify-between items-start">
                  <div>
-                    <h2 className="text-xl font-bold text-white leading-tight" style={{fontFamily:"'Space Grotesk', sans-serif"}}>
+                    <h2 className="text-base sm:text-xl font-bold text-white leading-tight" style={{fontFamily:"'Space Grotesk', sans-serif"}}>
                        {auctionState.itemTitle}
                     </h2>
                     <p className="text-xs text-slate-500 mt-1">Lot #29481-B</p>
@@ -2748,7 +2758,7 @@ function App() {
                 </div>
               )}
 
-              <div className="p-6 space-y-6">
+              <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                        <p className="text-[10px] text-slate-500 font-medium">Highest Bid</p>
@@ -2798,14 +2808,14 @@ function App() {
                          <Clock className="w-3 h-3" /> Time Remaining
                        </p>
                     </div>
-                    <div className={clsx("text-3xl font-black font-mono tracking-tighter tabular-nums drop-shadow-md", isUrgent ? "text-red-400 animate-pulse" : "text-white", auctionState.status === 'Closed' ? 'opacity-40' : '')}>
+                    <div className={clsx("text-2xl sm:text-3xl font-black font-mono tracking-tighter tabular-nums drop-shadow-md", isUrgent ? "text-red-400 animate-pulse" : "text-white", auctionState.status === 'Closed' ? 'opacity-40' : '')}>
                        {auctionState.status === 'Closed' ? 'ENDED' : formatTime(timeRemaining)}
                     </div>
                     {isUrgent && <p className="text-xs text-red-400 font-medium animate-pulse">Final seconds!</p>}
                  </div>
 
                  {/* Emoji reactions */}
-                 <div className="flex gap-2 justify-center">
+                 <div className="flex gap-1.5 sm:gap-2 justify-center flex-wrap">
                    {REACTION_KEYS.map(k => (
                      <button key={k} onClick={() => handleReaction(k)} className="text-xl hover:scale-125 transition-transform active:scale-100 bg-slate-800/50 rounded-xl p-2 hover:bg-slate-700/50">{REACTION_EMOJI[k]}</button>
                    ))}
@@ -2933,47 +2943,47 @@ function App() {
            </div>
         </div>
 
-        <div className="col-span-12 lg:col-span-6 space-y-6">
-           <div className="bg-slate-900/50 backdrop-blur-md border border-violet-900/25 rounded-3xl p-3 shadow-2xl relative overflow-hidden h-[540px] flex flex-col">
-              <div className="absolute top-6 left-6 z-20 flex gap-2">
+        <div className={clsx("col-span-12 lg:col-span-6 space-y-6", mobileAuctionTab !== 'video' && 'hidden lg:block')}>
+           <div className="bg-slate-900/50 backdrop-blur-md border border-violet-900/25 rounded-3xl p-2 sm:p-3 shadow-2xl relative overflow-hidden h-[320px] xs:h-[380px] sm:h-[480px] lg:h-[540px] flex flex-col">
+              <div className="absolute top-3 left-3 sm:top-6 sm:left-6 z-20 flex flex-wrap gap-1.5 sm:gap-2 max-w-[60%] sm:max-w-none">
                  {isLive && (
-                    <div className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-2 shadow-lg shadow-red-500/20 border border-red-500 animate-pulse">
+                    <div className="bg-red-600 text-white text-[9px] sm:text-[10px] font-black px-2 sm:px-3 py-1 rounded-full flex items-center gap-1.5 sm:gap-2 shadow-lg shadow-red-500/20 border border-red-500 animate-pulse">
                        <div className="w-1.5 h-1.5 bg-white rounded-full"></div> LIVE
                     </div>
                  )}
                   {isBroadcaster && (
-                    <div className="bg-slate-950/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-2 border border-slate-800">
+                    <div className="hidden sm:flex bg-slate-950/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full items-center gap-2 border border-slate-800">
                       <Video className="w-3 h-3 text-emerald-400" /> {streamQualityLabel}
                     </div>
                   )}
                     {isBroadcaster && (
-                      <div className={clsx('backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-2 border', micEnabled ? 'bg-emerald-950/80 border-emerald-700/40' : 'bg-slate-950/80 border-slate-800')}>
+                      <div className={clsx('hidden sm:flex backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full items-center gap-2 border', micEnabled ? 'bg-emerald-950/80 border-emerald-700/40' : 'bg-slate-950/80 border-slate-800')}>
                         {micEnabled ? <Mic className="w-3 h-3 text-emerald-400" /> : <MicOff className="w-3 h-3 text-slate-400" />} {micEnabled ? 'MIC ON' : 'MIC OFF'}
                       </div>
                     )}
-                 <div className="bg-slate-950/80 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full flex items-center gap-2 border border-slate-800">
-                    <Users className="w-3 h-3 text-violet-400" /> {viewerCount} WATCHING
+                 <div className="bg-slate-950/80 backdrop-blur-md text-white text-[9px] sm:text-[10px] font-black px-2 sm:px-3 py-1 rounded-full flex items-center gap-1.5 sm:gap-2 border border-slate-800">
+                    <Users className="w-3 h-3 text-violet-400" /> {viewerCount}
                  </div>
               </div>
 
                 {isBroadcaster && (
-                 <div className="absolute top-6 right-6 z-20 flex flex-wrap justify-end gap-2 max-w-[430px]">
-                   <select value={selectedStreamQuality} onChange={e => handleQualityChange(e.target.value as 'auto' | '720p' | '1080p')} className="bg-slate-950/90 border border-slate-700 text-white text-xs font-medium px-3 py-1.5 rounded-full outline-none cursor-pointer">
+                 <div className="absolute top-6 right-3 sm:right-6 z-20 flex flex-wrap justify-end gap-1.5 sm:gap-2 max-w-[200px] sm:max-w-[430px]">
+                   <select value={selectedStreamQuality} onChange={e => handleQualityChange(e.target.value as 'auto' | '720p' | '1080p')} className="bg-slate-950/90 border border-slate-700 text-white text-[10px] sm:text-xs font-medium px-2 sm:px-3 py-1 sm:py-1.5 rounded-full outline-none cursor-pointer">
                      <option value="auto">Auto quality</option>
                      <option value="720p">720p</option>
                      <option value="1080p">1080p</option>
                    </select>
-                   <button onClick={handleToggleMic} className={clsx('text-white text-xs font-medium px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5', micEnabled ? 'bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-700 hover:bg-slate-600')}>
-                     {micEnabled ? <Mic className="w-3 h-3" /> : <MicOff className="w-3 h-3" />} {micEnabled ? 'Mic On' : 'Mic Off'}
+                   <button onClick={handleToggleMic} className={clsx('text-white text-[10px] sm:text-xs font-medium px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full transition-all flex items-center gap-1 sm:gap-1.5', micEnabled ? 'bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-500/20' : 'bg-slate-700 hover:bg-slate-600')}>
+                     {micEnabled ? <Mic className="w-3 h-3" /> : <MicOff className="w-3 h-3" />} <span className="hidden sm:inline">{micEnabled ? 'Mic On' : 'Mic Off'}</span>
                    </button>
-                   <button onClick={handleSwitchCamera} className="bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-sky-500/20 transition-all flex items-center gap-1.5">
-                     <Camera className="w-3 h-3" /> Switch Cam
+                   <button onClick={handleSwitchCamera} className="bg-sky-600 hover:bg-sky-500 text-white text-[10px] sm:text-xs font-medium px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-md shadow-sky-500/20 transition-all flex items-center gap-1 sm:gap-1.5">
+                     <Camera className="w-3 h-3" /> <span className="hidden sm:inline">Switch Cam</span>
                    </button>
-                   <button onClick={() => startBroadcast()} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1.5">
-                     <RefreshCw className="w-3 h-3" /> Refresh
+                   <button onClick={() => startBroadcast()} className="bg-emerald-600 hover:bg-emerald-500 text-white text-[10px] sm:text-xs font-medium px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-md shadow-emerald-500/20 transition-all flex items-center gap-1 sm:gap-1.5">
+                     <RefreshCw className="w-3 h-3" /> <span className="hidden sm:inline">Refresh</span>
                    </button>
-                   <button onClick={stopBroadcast} className="bg-red-600 hover:bg-red-500 text-white text-xs font-medium px-4 py-1.5 rounded-full shadow-md shadow-red-500/20 transition-all flex items-center gap-1.5">
-                     <X className="w-3 h-3" /> Stop Broadcast
+                   <button onClick={stopBroadcast} className="bg-red-600 hover:bg-red-500 text-white text-[10px] sm:text-xs font-medium px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full shadow-md shadow-red-500/20 transition-all flex items-center gap-1 sm:gap-1.5">
+                     <X className="w-3 h-3" /> <span className="hidden sm:inline">Stop</span>
                    </button>
                  </div>
                 )}
@@ -3009,10 +3019,10 @@ function App() {
                  )}
               </div>
 
-              <div className="p-4 mt-auto">
-                 <form onSubmit={handlePlaceBid} className="flex gap-3">
+              <div className="p-2 sm:p-4 mt-auto">
+                 <form onSubmit={handlePlaceBid} className="flex gap-2 sm:gap-3">
                     <div className="flex-1 relative">
-                       <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl text-slate-600">₹</span>
+                       <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-lg sm:text-xl text-slate-600">₹</span>
                        <input 
                          type="number" 
                          value={bidAmount} 
@@ -3020,13 +3030,13 @@ function App() {
                          onFocus={() => { if (!bidAmount) setBidAmount(String(auctionState.currentBid + 100)); }}
                          disabled={moderationLocked}
                          placeholder={`Min ₹${(auctionState.currentBid + 100).toLocaleString()}`}
-                         className="w-full bg-white/5 border border-white/10 rounded-xl py-4 px-10 text-2xl font-bold text-white focus:outline-none focus:border-violet-500/60 focus:ring-2 focus:ring-violet-500/10 transition-all placeholder:text-slate-700 tabular-nums disabled:opacity-40" 
+                         className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 sm:py-4 px-8 sm:px-10 text-lg sm:text-2xl font-bold text-white focus:outline-none focus:border-violet-500/60 focus:ring-2 focus:ring-violet-500/10 transition-all placeholder:text-slate-700 tabular-nums disabled:opacity-40" 
                        />
                     </div>
                     <button 
                       type="submit"
                       disabled={auctionState.status !== 'Active' || moderationLocked}
-                      className="px-8 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl shadow-lg shadow-violet-500/20 hover:scale-[1.02] active:scale-95 transition-all text-lg disabled:opacity-30"
+                      className="px-5 sm:px-8 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl shadow-lg shadow-violet-500/20 hover:scale-[1.02] active:scale-95 transition-all text-base sm:text-lg disabled:opacity-30"
                     >
                        Bid
                     </button>
@@ -3034,17 +3044,17 @@ function App() {
               </div>
            </div>
 
-           <div className={clsx("bg-gradient-to-r from-violet-700 to-fuchsia-700 rounded-3xl p-6 flex items-center shadow-2xl shadow-violet-900/40 transition-all duration-700", auctionState.highestBidderId === myUser?.username ? "border-yellow-400 border-[3px] scale-[1.02]" : "border-violet-900/40 border")}>
-              <div className="bg-white/10 p-4 rounded-2xl mr-6">
-                <Trophy className={clsx("w-8 h-8", auctionState.highestBidderId === myUser?.username ? "text-yellow-400 animate-bounce" : "text-white/50")} />
+           <div className={clsx("bg-gradient-to-r from-violet-700 to-fuchsia-700 rounded-2xl sm:rounded-3xl p-3 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-0 shadow-2xl shadow-violet-900/40 transition-all duration-700", auctionState.highestBidderId === myUser?.username ? "border-yellow-400 border-[3px] scale-[1.02]" : "border-violet-900/40 border")}>
+              <div className="bg-white/10 p-3 sm:p-4 rounded-2xl sm:mr-6 flex-shrink-0">
+                <Trophy className={clsx("w-6 h-6 sm:w-8 sm:h-8", auctionState.highestBidderId === myUser?.username ? "text-yellow-400 animate-bounce" : "text-white/50")} />
               </div>
-              <div className="flex-1">
-                 <p className="text-xs text-white/60 font-medium tracking-wide">Current Top Bidder</p>
-                 <div className="flex items-baseline gap-3">
-                    <span className="text-xl font-bold text-white">
+              <div className="flex-1 min-w-0">
+                 <p className="text-[10px] sm:text-xs text-white/60 font-medium tracking-wide">Current Top Bidder</p>
+                 <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+                    <span className="text-base sm:text-xl font-bold text-white truncate">
                        {auctionState.highestBidderId === 'None' ? 'Waiting for first bid...' : auctionState.highestBidderId}
                     </span>
-                    <span className="text-xl font-semibold text-white/40 italic">₹{auctionState.currentBid.toLocaleString()}</span>
+                    <span className="text-sm sm:text-xl font-semibold text-white/40 italic">₹{auctionState.currentBid.toLocaleString()}</span>
                  </div>
               </div>
               {auctionState.highestBidderId === myUser?.username && (
@@ -3078,8 +3088,8 @@ function App() {
            })()}
         </div>
 
-           <div className="col-span-12 lg:col-span-3">
-           <div className="bg-slate-900/50 backdrop-blur-md border border-violet-900/25 rounded-3xl flex flex-col h-[744px] shadow-2xl">
+           <div className={clsx("col-span-12 lg:col-span-3", mobileAuctionTab !== 'chat' && 'hidden lg:block')}>
+           <div className="bg-slate-900/50 backdrop-blur-md border border-violet-900/25 rounded-3xl flex flex-col h-[500px] sm:h-[600px] lg:h-[744px] shadow-2xl">
               {/* Tabs */}
               <div className="p-4 border-b border-slate-800/50 flex gap-2">
                 <button onClick={() => setRightTab('bids')} className={clsx('flex-1 py-2 rounded-lg font-medium text-xs transition-all flex items-center justify-center gap-1.5', rightTab === 'bids' ? 'bg-violet-600 text-white shadow-md' : 'text-slate-500 hover:text-white bg-white/[0.03] hover:bg-white/8')}>
@@ -3201,6 +3211,24 @@ function App() {
         </div>
       </main>
 
+      {/* Mobile bottom navigation for auction room */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 lg:hidden bg-[#0c0c16]/95 backdrop-blur-xl border-t border-white/[0.08] safe-bottom">
+        <div className="flex items-center justify-around h-14 max-w-md mx-auto px-2">
+          <button onClick={() => setMobileAuctionTab('details')} className={clsx('flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all', mobileAuctionTab === 'details' ? 'text-violet-400 bg-violet-500/10' : 'text-slate-500')}>
+            <Package className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Details</span>
+          </button>
+          <button onClick={() => setMobileAuctionTab('video')} className={clsx('flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all', mobileAuctionTab === 'video' ? 'text-violet-400 bg-violet-500/10' : 'text-slate-500')}>
+            <Video className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Live</span>
+          </button>
+          <button onClick={() => setMobileAuctionTab('chat')} className={clsx('flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-xl transition-all', mobileAuctionTab === 'chat' ? 'text-violet-400 bg-violet-500/10' : 'text-slate-500')}>
+            <MessageSquare className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Chat</span>
+          </button>
+        </div>
+      </div>
+
       <style dangerouslySetInnerHTML={{ __html: `
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -3208,6 +3236,11 @@ function App() {
         @keyframes floatUp { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-200px) scale(1.5); opacity: 0; } }
         @keyframes bidFlash { 0% { color: #4ade80; transform: scale(1.1); text-shadow: 0 0 24px rgba(74,222,128,0.7); } 60% { color: #c084fc; transform: scale(1.02); } 100% { color: #c084fc; transform: scale(1); text-shadow: none; } }
         .bid-flash { animation: bidFlash 1.4s ease-out forwards; }
+        @media (max-width: 639px) {
+          @keyframes floatUp { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-120px); opacity: 0; } }
+          @keyframes bidFlash { 0% { color: #4ade80; } 100% { color: #c084fc; } }
+          .bid-flash { animation: bidFlash 0.6s ease-out forwards; }
+        }
       `}} />
     </div>
   );
